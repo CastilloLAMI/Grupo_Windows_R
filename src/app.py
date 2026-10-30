@@ -5,6 +5,20 @@ from PIL import Image
 from src.model import DetectorEmociones
 from src.preprocess import validar_extension
 
+CAMPO_IMAGEN = "imagen"
+HTTP_SOLICITUD_INVALIDA = 400
+
+
+def validar_archivo(archivos):
+    """Devuelve el archivo subido o lanza ValueError con el motivo."""
+    if CAMPO_IMAGEN not in archivos:
+        raise ValueError(f"Falta el archivo '{CAMPO_IMAGEN}'")
+    archivo = archivos[CAMPO_IMAGEN]
+    if archivo.filename == "":
+        raise ValueError("No se seleccionó ningún archivo")
+    validar_extension(archivo.filename)
+    return archivo
+
 
 def crear_app(detector=None):
     app = Flask(__name__)
@@ -16,15 +30,10 @@ def crear_app(detector=None):
 
     @app.post("/predecir")
     def predecir():
-        if "imagen" not in request.files:
-            return jsonify({"error": "Falta el archivo 'imagen'"}), 400
-        archivo = request.files["imagen"]
-        if archivo.filename == "":
-            return jsonify({"error": "No se seleccionó ningún archivo"}), 400
         try:
-            validar_extension(archivo.filename)
+            archivo = validar_archivo(request.files)
         except ValueError as e:
-            return jsonify({"error": str(e)}), 400
+            return jsonify({"error": str(e)}), HTTP_SOLICITUD_INVALIDA
         imagen = Image.open(archivo.stream).convert("RGB")
         return jsonify(detector.predecir(imagen))
 

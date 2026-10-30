@@ -1,5 +1,14 @@
 """Detector de emociones faciales con un modelo de Hugging Face."""
 
+MODELO_ID = "abhilash88/face-emotion-detection"
+TAREA = "image-classification"
+DECIMALES = 2
+
+
+def a_porcentaje(puntaje):
+    """Convierte un puntaje de 0-1 en porcentaje con 2 decimales."""
+    return round(puntaje * 100, DECIMALES)
+
 
 class DetectorEmociones:
     """Envuelve el pipeline de clasificación de imágenes.
@@ -15,22 +24,18 @@ class DetectorEmociones:
     def cargar(self):
         if self.clasificador is None:
             from transformers import pipeline
-            self.clasificador = pipeline(
-                "image-classification", model="abhilash88/face-emotion-detection"
-            )
+            self.clasificador = pipeline(TAREA, model=MODELO_ID)
         return self.clasificador
 
     def predecir(self, imagen):
         """Devuelve la emoción principal y el porcentaje de cada clase."""
-        r = self.cargar()(imagen)
-        if not r:
+        resultados = self.cargar()(imagen)
+        if not resultados:
             raise ValueError("El modelo no devolvió resultados")
-        r = sorted(r, key=lambda x: x["score"], reverse=True)
-        todas = {}
-        for x in r:
-            todas[x["label"]] = round(x["score"] * 100, 2)
+        ordenados = sorted(resultados, key=lambda r: r["score"], reverse=True)
+        principal = ordenados[0]
         return {
-            "emocion": r[0]["label"],
-            "confianza": round(r[0]["score"] * 100, 2),
-            "todas": todas,
+            "emocion": principal["label"],
+            "confianza": a_porcentaje(principal["score"]),
+            "todas": {r["label"]: a_porcentaje(r["score"]) for r in ordenados},
         }
