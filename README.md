@@ -9,8 +9,8 @@ PLAN: EMOTICONTIGO
 - Ruth Estefani Huaman Mamani — Desarrollador Fullstack
 - Eduardo Puma Ccorimanya — Desarrollador Frontend
 - Rebeca Yasbet Rocca Ramos — Ingeniero ML / IA
-- Junior Jeferson Sottec  Velasque — QA / Testing
-- 
+- Junior Jeferson Sottec Velasque — QA / Testing
+- Ayde Mirian Condori Valencia — QA / Testing
 
 ## Problema
 Hoy en día en la sociedad muchas de las personas entre ellas niños presentan dificultades en lo que son sus aprendizajes, tienen dificultades para expresar sus emociones o encontrar orientación cuando atraviesan momentos complicados mostrando asi dificultades de aprendizaje. 
@@ -104,3 +104,5 @@ numpy>=1.24.0
 flask>=3.0.0
 Pillow>=10.0.0
 matplotlib>=3.7.0
+coverage>=7.0.0
+flake8>=7.0.0
