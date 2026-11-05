@@ -51,6 +51,14 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
+## API
+- `GET /salud` → estado del servicio.
+- `POST /predecir` → recibe una imagen en el campo `imagen` (jpg/png, máximo 5 MB).
+- `GET /estadisticas` → total de análisis, conteo por emoción y confianza promedio.
+- `GET /historial?limite=50` → últimos análisis (límite entre 1 y 100).
+
+El historial se guarda en SQLite (`emoticontigo.db`). La ruta se puede cambiar con la variable `EMOTI_BD`.
+
 ## Interfaz de escritorio
 ```bash
 python -m src.interfaz
