@@ -51,6 +51,12 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
+## Interfaz de escritorio
+```bash
+python -m src.interfaz
+```
+La interfaz reutiliza `DetectorEmociones`. Si tienes una copia local del modelo, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors`.
+
 ---
 *Proyecto Final — Construccion de Software — Universidad Continental*
 
