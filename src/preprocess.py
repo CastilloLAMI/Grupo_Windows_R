@@ -31,6 +31,8 @@ def pixeles_desde_texto(texto):
     valores = np.array(texto.split(), dtype=float)
     if len(valores) != TOTAL_PIXELES:
         raise ValueError(f"Se esperaban {TOTAL_PIXELES} píxeles")
+    if (valores < 0).any() or (valores > VALOR_MAXIMO_PIXEL).any():
+        raise ValueError(f"Los píxeles deben estar entre 0 y {VALOR_MAXIMO_PIXEL}")
     return valores.reshape(TAMANO_IMAGEN, TAMANO_IMAGEN)
 
 
