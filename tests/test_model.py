@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from src.model import (
-    MODELO_ID, TAREA, TOP_K, DetectorEmociones, etiqueta_a_emocion,
+    MODELO_ID, TAREA, TOP_K, a_porcentaje, DetectorEmociones, etiqueta_a_emocion,
 )
 from src.preprocess import EMOCIONES
 
@@ -14,6 +14,16 @@ RESPUESTA_FALSA = [
     {"label": "LABEL_3", "score": 0.85},
     {"label": "LABEL_6", "score": 0.05},
 ]
+
+
+class TestPorcentajes(unittest.TestCase):
+
+    def test_limites(self):
+        self.assertEqual(a_porcentaje(0.0), 0.0)
+        self.assertEqual(a_porcentaje(1.0), 100.0)
+
+    def test_redondeo_a_dos_decimales(self):
+        self.assertEqual(a_porcentaje(0.1234), 12.34)
 
 
 class TestEtiquetas(unittest.TestCase):
@@ -77,6 +87,24 @@ class TestDetectorEmociones(unittest.TestCase):
         pipeline_falso.assert_called_once_with(
             TAREA, model="models/face-emotion-detection", top_k=TOP_K,
         )
+
+    def test_devuelve_las_siete_emociones(self):
+        respuesta = [
+            {"label": f"LABEL_{indice}", "score": 1 / 7}
+            for indice in range(7)
+        ]
+        detector = DetectorEmociones(clasificador=lambda img: respuesta)
+        todas = detector.predecir("imagen")["todas"]
+        self.assertEqual(set(todas), set(EMOCIONES))
+        self.assertAlmostEqual(sum(todas.values()), 100.0, delta=0.5)
+
+    def test_empate_conserva_el_orden(self):
+        respuesta = [
+            {"label": "LABEL_0", "score": 0.5},
+            {"label": "LABEL_1", "score": 0.5},
+        ]
+        detector = DetectorEmociones(clasificador=lambda img: respuesta)
+        self.assertEqual(detector.predecir("imagen")["emocion"], "enfado")
 
     def test_carga_una_sola_vez(self):
         clasificador = mock.Mock(return_value=RESPUESTA_FALSA)

@@ -1,5 +1,6 @@
 [run]
 source = src
+branch = true
 omit = tests/*, */__init__.py, src/interfaz.py
 
 [report]
