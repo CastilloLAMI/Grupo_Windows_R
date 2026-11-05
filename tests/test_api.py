@@ -8,7 +8,7 @@ from src.app import crear_app
 
 class DetectorFalso:
     def predecir(self, imagen):
-        return {"emocion": "happy", "confianza": 90.0, "todas": {"happy": 90.0}}
+        return {"emocion": "felicidad", "confianza": 90.0, "todas": {"felicidad": 90.0}}
 
 
 def imagen_png():
@@ -32,7 +32,7 @@ class TestApi(unittest.TestCase):
         datos = {"imagen": (imagen_png(), "rostro.png")}
         respuesta = self.cliente.post("/predecir", data=datos)
         self.assertEqual(respuesta.status_code, 200)
-        self.assertEqual(respuesta.get_json()["emocion"], "happy")
+        self.assertEqual(respuesta.get_json()["emocion"], "felicidad")
 
     def test_falta_imagen(self):
         respuesta = self.cliente.post("/predecir", data={})
