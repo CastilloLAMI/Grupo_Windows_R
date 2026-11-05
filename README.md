@@ -16,6 +16,8 @@ PLAN: EMOTICONTIGO
 Hoy en día en la sociedad muchas de las personas entre ellas niños presentan dificultades en lo que son sus aprendizajes, tienen dificultades para expresar sus emociones o encontrar orientación cuando atraviesan momentos complicados mostrando asi dificultades de aprendizaje. 
 
 ## Solucion
+Desarrollaremos un sistema de inteligencia artificial que utilizara una camara para capturar imagenes de las expresiones faciales de los estudiantes durante las clases . Mediante un modelo de reconocimiento facial de expresiones , el sistema analizara las imagenes y clasificara expresiones como alegría, tristeza, sorpresa o neutralidad. Los resultados se mostraran en un interfaz con graficos y estadisticas para apoyar la observación del docente, sin asumir que las expresiones determinen si un niño aprendio o no.
+
 ## Alcance del Proyecto
 
 EmotiContigo es una herramienta de **apoyo a la observación docente**. Su alcance está delimitado de forma explícita para garantizar un uso ético y responsable de la inteligencia artificial en el aula.
