@@ -4,9 +4,12 @@ import os
 from flask import Flask, jsonify, request
 from PIL import Image, UnidentifiedImageError
 
-from src.constantes import TAMANO_MAXIMO_BYTES, TAMANO_MAXIMO_MB
+from src.constantes import (
+    LIMITE_HISTORIAL_DEFECTO, LIMITE_HISTORIAL_MAX, LIMITE_HISTORIAL_MIN,
+    TAMANO_MAXIMO_BYTES, TAMANO_MAXIMO_MB,
+)
 from src.historial import (
-    LIMITE_HISTORIAL, LIMITE_MAXIMO, RUTA_POR_DEFECTO,
+    RUTA_POR_DEFECTO,
     guardar_analisis, inicializar_bd, listar_historial, obtener_estadisticas,
 )
 from src.model import DetectorEmociones
@@ -73,14 +76,17 @@ def crear_app(detector=None, ruta_bd=None):
     @app.get("/historial")
     def historial():
         texto = request.args.get("limite")
-        limite = LIMITE_HISTORIAL
+        limite = LIMITE_HISTORIAL_DEFECTO
         if texto is not None:
             try:
                 limite = int(texto)
             except ValueError:
-                return jsonify({"error": "El límite debe ser un número entero"}), 400
-        if limite < 1 or limite > LIMITE_MAXIMO:
-            mensaje = f"El límite debe estar entre 1 y {LIMITE_MAXIMO}"
+                mensaje = "El límite debe ser un número entero"
+                return jsonify({"error": mensaje}), HTTP_SOLICITUD_INVALIDA
+        if limite < LIMITE_HISTORIAL_MIN or limite > LIMITE_HISTORIAL_MAX:
+            mensaje = (
+                f"El límite debe estar entre {LIMITE_HISTORIAL_MIN} y {LIMITE_HISTORIAL_MAX}"
+            )
             return jsonify({"error": mensaje}), HTTP_SOLICITUD_INVALIDA
         return jsonify(listar_historial(app.config["RUTA_BD"], limite))
 
