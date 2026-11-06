@@ -1,6 +1,8 @@
 """API Flask de EmotiContigo."""
 from flask import Flask, jsonify, request
 from PIL import Image
+from src import alcance
+
 
 from src.model import DetectorEmociones
 from src.preprocess import validar_extension
