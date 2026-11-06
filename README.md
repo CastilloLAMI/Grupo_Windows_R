@@ -106,64 +106,9 @@ python -m src.interfaz
 ```
 La interfaz reutiliza `DetectorEmociones`. Si tienes una copia local del modelo, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors`.
 
----
-*Proyecto Final — Construccion de Software — Universidad Continental*
-
---- ESTRUCTURA ---
-Selecciona componentes arriba.
-
---- CI/CD ---
-name: CI - EmotiContigo
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11"]
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run tests
-      run: |
-        python -m unittest discover -s tests -v
-
-    - name: Lint
-      run: |
-        pip install flake8
-        flake8 src/ --max-line-length=120
-
---- REQUIREMENTS ---
-transformers>=4.35.0
-torch>=2.0.0
-datasets>=2.14.0
-scikit-learn>=1.3.0
-numpy>=1.24.0
-flask>=3.0.0
-Pillow>=10.0.0
-matplotlib>=3.7.0
-coverage>=7.0.0
-flake8>=7.0.0
-
-
 ## Constantes del proyecto
 
+Los valores fijos (tamano maximo de imagen, extensiones permitidas, limites del historial y etiquetas de emociones FER2013) estan centralizados en `src/constantes.py` para evitar numeros magicos. Sus pruebas estan en `tests/test_constantes.py`.
 
-Los valores fijos (tamano maximo de imagen, extensiones permitidas, limites del historial y etiquetas de emociones FER2013) estan centralizados en src/constantes.py para evitar numeros magicos. Sus pruebas estan en tests/test_constantes.py.
+---
+*Proyecto Final — Construccion de Software — Universidad Continental*
