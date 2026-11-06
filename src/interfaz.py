@@ -32,6 +32,20 @@ COLOR_PROCESO = "orange"
 COLOR_TRANSPARENTE = "transparent"
 EXTENSIONES = "*.jpg *.jpeg *.png *.bmp"
 RETARDO_CARGA_MS = 100
+FUENTE = "Arial"
+FUENTE_TITULO = (FUENTE, 26, "bold")
+FUENTE_SUBTITULO = (FUENTE, 13)
+FUENTE_ESTADO = (FUENTE, 12)
+FUENTE_PANEL = (FUENTE, 19, "bold")
+FUENTE_ETIQUETA = (FUENTE, 12, "bold")
+FUENTE_RESULTADO = (FUENTE, 20, "bold")
+FUENTE_SECCION = (FUENTE, 15, "bold")
+FUENTE_EMOCION = (FUENTE, 13, "bold")
+FUENTE_PORCENTAJE = (FUENTE, 11)
+ALTO_ENCABEZADO = 90
+ALTO_BOTON = 42
+ALTO_BARRA = 12
+ANCHO_TEXTO_RESULTADO = 350
 
 
 class AplicacionEmociones(ctk.CTk):
@@ -58,7 +72,7 @@ class AplicacionEmociones(ctk.CTk):
         self.estado = ctk.CTkLabel(
             self,
             text="Cargando modelo de inteligencia artificial...",
-            font=("Arial", 12),
+            font=FUENTE_ESTADO,
             text_color=COLOR_PROCESO,
         )
         self.estado.pack(pady=(0, 12))
@@ -66,7 +80,7 @@ class AplicacionEmociones(ctk.CTk):
     def _crear_encabezado(self):
         encabezado = ctk.CTkFrame(
             self,
-            height=90,
+            height=ALTO_ENCABEZADO,
             corner_radius=0,
             fg_color=COLOR_ENCABEZADO,
         )
@@ -75,15 +89,15 @@ class AplicacionEmociones(ctk.CTk):
 
         ctk.CTkLabel(
             encabezado,
-            text="EMOTICONTIGO",
-            font=("Arial", 26, "bold"),
+            text=TITULO.upper(),
+            font=FUENTE_TITULO,
             text_color="white",
         ).pack(pady=(17, 0))
 
         ctk.CTkLabel(
             encabezado,
             text="Sistema de detección de expresiones faciales",
-            font=("Arial", 13),
+            font=FUENTE_SUBTITULO,
             text_color=COLOR_TEXTO_ENCABEZADO,
         ).pack()
 
@@ -94,7 +108,7 @@ class AplicacionEmociones(ctk.CTk):
         ctk.CTkLabel(
             panel,
             text="Imagen seleccionada",
-            font=("Arial", 19, "bold"),
+            font=FUENTE_PANEL,
         ).pack(pady=20)
 
         self.vista_imagen = ctk.CTkLabel(
@@ -111,14 +125,14 @@ class AplicacionEmociones(ctk.CTk):
         self.nombre = ctk.CTkLabel(
             panel,
             text="Ninguna imagen seleccionada",
-            font=("Arial", 12),
+            font=FUENTE_ESTADO,
         )
         self.nombre.pack(pady=10)
 
         self.boton_seleccionar = ctk.CTkButton(
             panel,
             text="Seleccionar imagen",
-            height=42,
+            height=ALTO_BOTON,
             command=self._seleccionar_imagen,
         )
         self.boton_seleccionar.pack(padx=30, pady=10, fill="x")
@@ -126,7 +140,7 @@ class AplicacionEmociones(ctk.CTk):
         self.boton_analizar = ctk.CTkButton(
             panel,
             text="Analizar imagen",
-            height=42,
+            height=ALTO_BOTON,
             command=self._analizar_imagen,
             state="disabled",
         )
@@ -139,29 +153,29 @@ class AplicacionEmociones(ctk.CTk):
         ctk.CTkLabel(
             panel,
             text="Resultados del análisis",
-            font=("Arial", 19, "bold"),
+            font=FUENTE_PANEL,
         ).pack(pady=20)
 
         ctk.CTkLabel(
             panel,
             text="EXPRESIÓN PRINCIPAL",
-            font=("Arial", 12, "bold"),
+            font=FUENTE_ETIQUETA,
             text_color=COLOR_TITULO_SECCION,
         ).pack(pady=(15, 5))
 
         self.resultado_principal = ctk.CTkLabel(
             panel,
             text="Esperando análisis...",
-            font=("Arial", 20, "bold"),
+            font=FUENTE_RESULTADO,
             text_color=COLOR_PROGRESO,
-            wraplength=350,
+            wraplength=ANCHO_TEXTO_RESULTADO,
         )
         self.resultado_principal.pack(pady=15)
 
         ctk.CTkLabel(
             panel,
             text="Distribución de expresiones",
-            font=("Arial", 15, "bold"),
+            font=FUENTE_SECCION,
         ).pack(pady=10)
 
         self.resultados_frame = ctk.CTkScrollableFrame(
@@ -284,12 +298,12 @@ class AplicacionEmociones(ctk.CTk):
         ctk.CTkLabel(
             fila,
             text=emocion,
-            font=("Arial", 13, "bold"),
+            font=FUENTE_EMOCION,
         ).pack(anchor="w")
 
         barra = ctk.CTkProgressBar(
             fila,
-            height=12,
+            height=ALTO_BARRA,
             progress_color=COLOR_PROGRESO,
         )
         barra.pack(fill="x", pady=3)
@@ -298,7 +312,7 @@ class AplicacionEmociones(ctk.CTk):
         ctk.CTkLabel(
             fila,
             text=f"{porcentaje:.2f}%",
-            font=("Arial", 11),
+            font=FUENTE_PORCENTAJE,
         ).pack(anchor="e")
 
     def _limpiar_resultados(self):
