@@ -14,6 +14,7 @@ from src.historial import (
 )
 from src.model import DetectorEmociones
 from src.preprocess import validar_extension
+from src import alcance
 
 CAMPO_IMAGEN = "imagen"
 HTTP_SOLICITUD_INVALIDA = 400
@@ -46,6 +47,11 @@ def crear_app(detector=None, ruta_bd=None):
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = TAMANO_MAXIMO_BYTES
     app.config["RUTA_BD"] = ruta_bd or os.getenv("EMOTI_BD") or RUTA_POR_DEFECTO
+
+    violaciones = alcance.validar_rutas(app)
+    if violaciones:
+        raise RuntimeError("El sistema viola su alcance:\n" + "\n".join(violaciones))
+
     inicializar_bd(app.config["RUTA_BD"])
     detector = detector or DetectorEmociones()
 
@@ -66,6 +72,11 @@ def crear_app(detector=None, ruta_bd=None):
         except ValueError as error:
             return jsonify({"error": str(error)}), HTTP_SOLICITUD_INVALIDA
         resultado = detector.predecir(imagen)
+
+        violaciones_resp = alcance.validar_respuesta(str(resultado))
+        if violaciones_resp:
+            return jsonify({"error": "Respuesta fuera de alcance", "detalle": violaciones_resp}), 500
+
         guardar_analisis(resultado, app.config["RUTA_BD"])
         return jsonify(resultado)
 
