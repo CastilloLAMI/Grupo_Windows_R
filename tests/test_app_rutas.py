@@ -6,13 +6,9 @@ import unittest
 from src.app import crear_app
 
 
-
-
 class DetectorFalso:
     def predecir(self, imagen):
         return {"emocion": "neutral", "confianza": 100.0, "todas": {"neutral": 100.0}}
-
-
 
 
 class TestRutasApp(unittest.TestCase):
@@ -44,8 +40,6 @@ class TestRutasApp(unittest.TestCase):
     def test_historial_limite_fuera_de_rango_da_400(self):
         self.assertEqual(self.cliente.get("/historial?limite=0").status_code, 400)
         self.assertEqual(self.cliente.get("/historial?limite=101").status_code, 400)
-
-
 
 
 if __name__ == "__main__":
