@@ -161,3 +161,9 @@ Pillow>=10.0.0
 matplotlib>=3.7.0
 coverage>=7.0.0
 flake8>=7.0.0
+
+
+## Constantes del proyecto
+
+
+Los valores fijos (tamano maximo de imagen, extensiones permitidas, limites del historial y etiquetas de emociones FER2013) estan centralizados en src/constantes.py para evitar numeros magicos. Sus pruebas estan en tests/test_constantes.py.
