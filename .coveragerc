@@ -1,6 +1,7 @@
 [run]
 source = src
-omit = tests/*, */__init__.py
+branch = true
+omit = tests/*, */__init__.py, src/interfaz.py
 
 [report]
 show_missing = True

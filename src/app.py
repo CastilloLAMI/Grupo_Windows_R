@@ -1,14 +1,23 @@
 """API Flask de EmotiContigo."""
+import os
+
 from flask import Flask, jsonify, request
-from PIL import Image
-from src import alcance
+from PIL import Image, UnidentifiedImageError
 
-
+from src.historial import (
+    LIMITE_HISTORIAL, LIMITE_MAXIMO, RUTA_POR_DEFECTO,
+    guardar_analisis, inicializar_bd, listar_historial, obtener_estadisticas,
+)
 from src.model import DetectorEmociones
 from src.preprocess import validar_extension
+from src import alcance  # <-- IMPORTAMOS EL ALCANCE AQUÍ
 
 CAMPO_IMAGEN = "imagen"
 HTTP_SOLICITUD_INVALIDA = 400
+HTTP_ENTIDAD_DEMASIADO_GRANDE = 413
+TAMANO_MAXIMO_MB = 5
+BYTES_POR_MB = 1024 * 1024
+MENSAJE_IMAGEN_INVALIDA = "El archivo no es una imagen válida"
 
 
 def validar_archivo(archivos):
@@ -22,9 +31,33 @@ def validar_archivo(archivos):
     return archivo
 
 
-def crear_app(detector=None):
+def abrir_imagen(archivo):
+    """Decodifica la imagen subida o lanza ValueError si está corrupta."""
+    try:
+        imagen = Image.open(archivo.stream)
+        imagen.load()
+        return imagen.convert("RGB")
+    except (UnidentifiedImageError, OSError, ValueError) as error:
+        raise ValueError(MENSAJE_IMAGEN_INVALIDA) from error
+
+
+def crear_app(detector=None, ruta_bd=None):
     app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = TAMANO_MAXIMO_MB * BYTES_POR_MB
+    app.config["RUTA_BD"] = ruta_bd or os.getenv("EMOTI_BD") or RUTA_POR_DEFECTO
+    
+    # Validación del alcance al arrancar (No hay rutas prohibidas)
+    violaciones = alcance.validar_rutas(app)
+    if violaciones:
+        raise RuntimeError("El sistema viola su alcance:\n" + "\n".join(violaciones))
+
+    inicializar_bd(app.config["RUTA_BD"])
     detector = detector or DetectorEmociones()
+
+    @app.errorhandler(HTTP_ENTIDAD_DEMASIADO_GRANDE)
+    def archivo_demasiado_grande(_error):
+        mensaje = f"La imagen supera el límite de {TAMANO_MAXIMO_MB} MB"
+        return jsonify({"error": mensaje}), HTTP_ENTIDAD_DEMASIADO_GRANDE
 
     @app.get("/salud")
     def salud():
@@ -34,10 +67,36 @@ def crear_app(detector=None):
     def predecir():
         try:
             archivo = validar_archivo(request.files)
-        except ValueError as e:
-            return jsonify({"error": str(e)}), HTTP_SOLICITUD_INVALIDA
-        imagen = Image.open(archivo.stream).convert("RGB")
-        return jsonify(detector.predecir(imagen))
+            imagen = abrir_imagen(archivo)
+        except ValueError as error:
+            return jsonify({"error": str(error)}), HTTP_SOLICITUD_INVALIDA
+        resultado = detector.predecir(imagen)
+        
+        # Validación del alcance en la respuesta
+        violaciones = alcance.validar_respuesta(str(resultado))
+        if violaciones:
+            return jsonify({"error": "Respuesta fuera de alcance", "detalle": violaciones}), 500
+            
+        guardar_analisis(resultado, app.config["RUTA_BD"])
+        return jsonify(resultado)
+
+    @app.get("/estadisticas")
+    def estadisticas():
+        return jsonify(obtener_estadisticas(app.config["RUTA_BD"]))
+
+    @app.get("/historial")
+    def historial():
+        texto = request.args.get("limite")
+        limite = LIMITE_HISTORIAL
+        if texto is not None:
+            try:
+                limite = int(texto)
+            except ValueError:
+                return jsonify({"error": "El límite debe ser un número entero"}), 400
+        if limite < 1 or limite > LIMITE_MAXIMO:
+            mensaje = f"El límite debe estar entre 1 y {LIMITE_MAXIMO}"
+            return jsonify({"error": mensaje}), HTTP_SOLICITUD_INVALIDA
+        return jsonify(listar_historial(app.config["RUTA_BD"], limite))
 
     return app
 

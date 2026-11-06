@@ -20,12 +20,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
 
-      # Los tests usan un detector falso, así que no necesitan torch ni transformers
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
+          pip install -r requirements.txt
 
       - name: Lint
         run: flake8 src/ tests/ --max-line-length=120
