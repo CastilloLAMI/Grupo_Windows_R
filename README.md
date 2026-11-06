@@ -9,6 +9,7 @@ PLAN: EMOTICONTIGO
 - Ruth Estefani Huaman Mamani — Desarrollador Fullstack
 - Eduardo Puma Ccorimanya — Desarrollador Frontend
 - Rebeca Yasbet Rocca Ramos — Ingeniero ML / IA
+- Avance: Implementación del modelo Face-Emotion-Detection para clasificación de expresiones.
 - Junior Jeferson Sottec Velasque — QA / Testing
 - Ayde Mirian Condori Valencia — QA / Testing
 
