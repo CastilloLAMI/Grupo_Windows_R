@@ -4,6 +4,7 @@ import os
 from flask import Flask, jsonify, request
 from PIL import Image, UnidentifiedImageError
 
+from src.constantes import TAMANO_MAXIMO_BYTES, TAMANO_MAXIMO_MB
 from src.historial import (
     LIMITE_HISTORIAL, LIMITE_MAXIMO, RUTA_POR_DEFECTO,
     guardar_analisis, inicializar_bd, listar_historial, obtener_estadisticas,
@@ -14,8 +15,6 @@ from src.preprocess import validar_extension
 CAMPO_IMAGEN = "imagen"
 HTTP_SOLICITUD_INVALIDA = 400
 HTTP_ENTIDAD_DEMASIADO_GRANDE = 413
-TAMANO_MAXIMO_MB = 5
-BYTES_POR_MB = 1024 * 1024
 MENSAJE_IMAGEN_INVALIDA = "El archivo no es una imagen válida"
 
 
@@ -42,7 +41,7 @@ def abrir_imagen(archivo):
 
 def crear_app(detector=None, ruta_bd=None):
     app = Flask(__name__)
-    app.config["MAX_CONTENT_LENGTH"] = TAMANO_MAXIMO_MB * BYTES_POR_MB
+    app.config["MAX_CONTENT_LENGTH"] = TAMANO_MAXIMO_BYTES
     app.config["RUTA_BD"] = ruta_bd or os.getenv("EMOTI_BD") or RUTA_POR_DEFECTO
     inicializar_bd(app.config["RUTA_BD"])
     detector = detector or DetectorEmociones()

@@ -4,11 +4,14 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
+from src.constantes import (
+    LIMITE_HISTORIAL_DEFECTO, LIMITE_HISTORIAL_MAX, NOMBRE_BD_DEFECTO,
+)
 from src.preprocess import EMOCIONES
 
-RUTA_POR_DEFECTO = "emoticontigo.db"
-LIMITE_HISTORIAL = 50
-LIMITE_MAXIMO = 100
+RUTA_POR_DEFECTO = NOMBRE_BD_DEFECTO
+LIMITE_HISTORIAL = LIMITE_HISTORIAL_DEFECTO
+LIMITE_MAXIMO = LIMITE_HISTORIAL_MAX
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS analisis (
