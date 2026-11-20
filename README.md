@@ -107,6 +107,14 @@ python -m src.interfaz
 ```
 La interfaz reutiliza `DetectorEmociones`. Si tienes una copia local del modelo, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors`.
 
+## Cámara del aula
+```bash
+python -m src.camara
+```
+Abre la cámara, detecta los rostros con el clasificador Haar de OpenCV y analiza cada rostro cada 5 segundos. Muestra un recuadro con la emoción sobre cada rostro (tecla `q` para salir) y guarda en el historial un registro por rostro. No se guardan las imágenes, solo la emoción y la confianza.
+
+El módulo `src/camara.py` no depende de la interfaz: `Camara` abre y lee la cámara, `DetectorRostros` ubica los rostros, `AnalizadorAula` clasifica cada rostro y resume el grupo (emoción predominante y distribución promedio). Sus pruebas están en `tests/test_camara.py` y usan cámaras y rostros simulados.
+
 ## Constantes del proyecto
 
 Los valores fijos (tamano maximo de imagen, extensiones permitidas, limites del historial y etiquetas de emociones FER2013) estan centralizados en `src/constantes.py` para evitar numeros magicos. Sus pruebas estan en `tests/test_constantes.py`.
