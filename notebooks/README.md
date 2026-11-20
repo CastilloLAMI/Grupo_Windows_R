@@ -4,7 +4,7 @@
 
 El notebook `entrenamiento_emociones.ipynb`:
 
-1. Evalúa el modelo actual (`abhilash88/face-emotion-detection`, ViT-Base ya entrenado con FER2013) sobre la parte de prueba de FER2013.
+1. Evalúa el modelo actual (`abhilash88/face-emotion-detection`, ViT-Base ya entrenado con FER2013) sobre la parte de prueba original de FER2013 (PrivateTest).
 2. Lo ajusta (fine-tuning) unas épocas más, con pesos por clase (para *asco*, *miedo* y *enfado*, que tienen pocas imágenes) y aumentos de datos.
 3. Compara los dos modelos (exactitud, F1 macro, F1 por emoción y matrices de confusión) y guarda el modelo nuevo.
 
