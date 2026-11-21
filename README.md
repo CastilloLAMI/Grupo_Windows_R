@@ -105,7 +105,24 @@ El historial se guarda en SQLite (`emoticontigo.db`). La ruta se puede cambiar c
 ```bash
 python -m src.interfaz
 ```
-La interfaz reutiliza `DetectorEmociones`. Si tienes una copia local del modelo, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors`.
+Ventana hecha con customtkinter (y `ttk.Treeview` para la tabla del historial), con cuatro pestañas que siguen el mockup de `docs/mockup/`:
+
+- **Clase en vivo:** muestra la cámara con un recuadro y la emoción sobre cada rostro. Se elige la cámara y cada cuánto analizar (5, 10 o 30 s); *Capturar ahora* analiza al momento. A la derecha, el resumen del grupo: rostros detectados, emoción predominante, distribución promedio y últimas lecturas.
+- **Analizar imagen:** analiza una fotografía (jpg o png).
+- **Estadísticas:** total de análisis, emoción más frecuente, confianza promedio y gráfico por emoción.
+- **Historial:** tabla de los últimos 100 análisis con filtro por emoción y exportación a CSV.
+
+La cámara se lee y se analiza en segundo plano (`MonitorCamara` en `src/camara.py`), así la ventana no se congela mientras trabaja el modelo. Cada lectura guarda un registro por rostro en el historial; las imágenes no se guardan.
+
+La interfaz reutiliza `DetectorEmociones`. Para usar el modelo ajustado, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors` (por ejemplo `modelos/modelo_emoticontigo`).
+
+## Cámara del aula
+```bash
+python -m src.camara
+```
+Abre la cámara, detecta los rostros con el clasificador Haar de OpenCV y analiza cada rostro cada 5 segundos. Muestra un recuadro con la emoción sobre cada rostro (tecla `q` para salir) y guarda en el historial un registro por rostro. No se guardan las imágenes, solo la emoción y la confianza.
+
+El módulo `src/camara.py` no depende de la interfaz: `Camara` abre y lee la cámara, `DetectorRostros` ubica los rostros, `AnalizadorAula` clasifica cada rostro y resume el grupo (emoción predominante y distribución promedio). Sus pruebas están en `tests/test_camara.py` y usan cámaras y rostros simulados.
 
 ## Constantes del proyecto
 
