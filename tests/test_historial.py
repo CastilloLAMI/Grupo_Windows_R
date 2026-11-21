@@ -1,9 +1,10 @@
+import csv
 import os
 import tempfile
 import unittest
 
 from src.historial import (
-    guardar_analisis, inicializar_bd, listar_historial, obtener_estadisticas,
+    exportar_csv, guardar_analisis, inicializar_bd, listar_historial, obtener_estadisticas,
 )
 from src.preprocess import EMOCIONES
 
@@ -62,6 +63,25 @@ class TestHistorial(unittest.TestCase):
             guardar_analisis(RESULTADO, self.ruta)
 
         self.assertEqual(len(listar_historial(self.ruta, limite=2)), 2)
+
+    def test_exportar_csv(self):
+        guardar_analisis(RESULTADO, self.ruta)
+        ruta_csv = os.path.join(self.carpeta.name, "historial.csv")
+        cantidad = exportar_csv(listar_historial(self.ruta), ruta_csv)
+        self.assertEqual(cantidad, 1)
+        with open(ruta_csv, newline="", encoding="utf-8-sig") as archivo:
+            filas = list(csv.reader(archivo))
+        self.assertEqual(filas[0][:4], ["id", "fecha", "emocion", "confianza"])
+        self.assertEqual(filas[0][4:], list(EMOCIONES))
+        self.assertEqual(filas[1][2], "felicidad")
+        self.assertEqual(float(filas[1][4 + EMOCIONES.index("neutral")]), 10.0)
+        self.assertEqual(float(filas[1][4 + EMOCIONES.index("asco")]), 0.0)
+
+    def test_exportar_csv_vacio(self):
+        ruta_csv = os.path.join(self.carpeta.name, "vacio.csv")
+        self.assertEqual(exportar_csv([], ruta_csv), 0)
+        with open(ruta_csv, newline="", encoding="utf-8-sig") as archivo:
+            self.assertEqual(len(list(csv.reader(archivo))), 1)
 
 
 if __name__ == "__main__":

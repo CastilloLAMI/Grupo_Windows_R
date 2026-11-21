@@ -1,4 +1,5 @@
 """Persistencia del historial de análisis en SQLite."""
+import csv
 import json
 import sqlite3
 from contextlib import contextmanager
@@ -99,3 +100,23 @@ def listar_historial(ruta=RUTA_POR_DEFECTO, limite=LIMITE_HISTORIAL):
         }
         for fila in filas
     ]
+
+
+COLUMNAS_CSV = ("id", "fecha", "emocion", "confianza")
+
+
+def exportar_csv(registros, ruta_csv):
+    """Escribe los registros en un CSV y devuelve cuántos escribió.
+
+    Incluye una columna por emoción con su porcentaje. Usa UTF-8 con BOM
+    para que Excel muestre bien las tildes.
+    """
+    with open(ruta_csv, "w", newline="", encoding="utf-8-sig") as archivo:
+        escritor = csv.writer(archivo)
+        escritor.writerow(COLUMNAS_CSV + tuple(EMOCIONES))
+        for registro in registros:
+            escritor.writerow([
+                registro["id"], registro["fecha"], registro["emocion"], registro["confianza"],
+                *[registro["todas"].get(emocion, 0.0) for emocion in EMOCIONES],
+            ])
+    return len(registros)

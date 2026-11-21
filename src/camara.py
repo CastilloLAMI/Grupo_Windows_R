@@ -1,4 +1,6 @@
 """Captura de la cámara del aula y análisis de los rostros de cada cuadro."""
+import sys
+import threading
 import time
 
 import cv2
@@ -31,6 +33,10 @@ TITULO_VENTANA = "EmotiContigo - Camara (q para salir)"
 TECLA_SALIR = "q"
 ESPERA_TECLA_MS = 1
 
+# Monitor en segundo plano
+ESPERA_ANALISIS_S = 0.1
+ESPERA_DETENER_S = 2
+
 # Colores BGR (OpenCV) para cada emoción
 COLORES_EMOCION_BGR = {
     "enfado": (69, 69, 214),
@@ -48,6 +54,13 @@ class ErrorCamara(RuntimeError):
     """La cámara no se pudo abrir o dejó de entregar imágenes."""
 
 
+def abrir_captura(indice):
+    """Abre la cámara; en Windows usa DirectShow, que abre mucho más rápido."""
+    if sys.platform.startswith("win"):  # pragma: no cover
+        return cv2.VideoCapture(indice, cv2.CAP_DSHOW)
+    return cv2.VideoCapture(indice)
+
+
 class Camara:
     """Envuelve cv2.VideoCapture para abrir, leer y cerrar la cámara.
 
@@ -58,7 +71,7 @@ class Camara:
 
     def __init__(self, indice=INDICE_CAMARA_DEFECTO, fabrica=None):
         self.indice = indice
-        self.fabrica = fabrica or cv2.VideoCapture
+        self.fabrica = fabrica or abrir_captura
         self.captura = None
 
     @property
@@ -208,6 +221,115 @@ def dibujar_resultados(cuadro, rostros):
 def toca_analizar(ultimo_analisis, ahora, intervalo=INTERVALO_ANALISIS_S):
     """Indica si ya pasó el intervalo desde el último análisis."""
     return ultimo_analisis is None or ahora - ultimo_analisis >= intervalo
+
+
+class MonitorCamara:
+    """Lee la cámara y analiza los rostros en segundo plano.
+
+    Un hilo lee cuadros sin parar (para mostrar el video fluido) y otro
+    analiza el último cuadro cada `intervalo` segundos, o al momento si se
+    pide con capturar_ahora(). La interfaz consulta instantanea() para
+    dibujar, sin quedarse congelada mientras el modelo trabaja.
+    """
+
+    def __init__(self, camara, analizador, intervalo=INTERVALO_ANALISIS_S,
+                 guardar=guardar_resultado_cuadro, reloj=time.monotonic):
+        self.camara = camara
+        self.analizador = analizador
+        self.intervalo = intervalo
+        self.guardar = guardar
+        self.reloj = reloj
+        self.error = None
+        self.numero_resultado = 0
+        self._cuadro = None
+        self._resultado = None
+        self._ultimo_analisis = None
+        self._bloqueo = threading.Lock()
+        self._activo = threading.Event()
+        self._captura_pedida = threading.Event()
+        self._hilos = []
+
+    @property
+    def activo(self):
+        return self._activo.is_set()
+
+    def iniciar(self):
+        """Abre la cámara y arranca los hilos. Lanza ErrorCamara si no abre."""
+        if self.activo:
+            return
+        self.error = None
+        self._ultimo_analisis = None
+        self.camara.abrir()
+        self._activo.set()
+        self._hilos = [
+            threading.Thread(target=self._bucle_lectura, daemon=True),
+            threading.Thread(target=self._bucle_analisis, daemon=True),
+        ]
+        for hilo in self._hilos:
+            hilo.start()
+
+    def detener(self):
+        """Detiene los hilos y cierra la cámara."""
+        self._activo.clear()
+        for hilo in self._hilos:
+            if hilo is not threading.current_thread():
+                hilo.join(timeout=ESPERA_DETENER_S)
+        self._hilos = []
+        self._captura_pedida.clear()
+        self.camara.cerrar()
+
+    def capturar_ahora(self):
+        """Pide analizar el próximo cuadro sin esperar el intervalo."""
+        self._captura_pedida.set()
+
+    def instantanea(self):
+        """Devuelve (último cuadro, último resultado, número de resultado)."""
+        with self._bloqueo:
+            return self._cuadro, self._resultado, self.numero_resultado
+
+    def paso_lectura(self):
+        cuadro = self.camara.leer()
+        with self._bloqueo:
+            self._cuadro = cuadro
+        return cuadro
+
+    def paso_analisis(self, ahora=None):
+        """Analiza el último cuadro si toca; devuelve el resultado o None."""
+        ahora = self.reloj() if ahora is None else ahora
+        pedida = self._captura_pedida.is_set()
+        if not pedida and not toca_analizar(self._ultimo_analisis, ahora, self.intervalo):
+            return None
+        with self._bloqueo:
+            cuadro = self._cuadro
+        if cuadro is None:
+            return None
+        self._captura_pedida.clear()
+        resultado = self.analizador.analizar_cuadro(cuadro)
+        self.guardar(resultado)
+        with self._bloqueo:
+            self._resultado = resultado
+            self.numero_resultado += 1
+        self._ultimo_analisis = ahora
+        return resultado
+
+    def _fallar(self, error):
+        self.error = str(error)
+        self._activo.clear()
+
+    def _bucle_lectura(self):
+        while self.activo:
+            try:
+                self.paso_lectura()
+            except Exception as error:  # noqa: BLE001
+                self._fallar(error)
+
+    def _bucle_analisis(self):
+        while self.activo:
+            try:
+                self.paso_analisis()
+            except Exception as error:  # noqa: BLE001
+                self._fallar(error)
+            time.sleep(ESPERA_ANALISIS_S)
 
 
 def main(indice=INDICE_CAMARA_DEFECTO, intervalo=INTERVALO_ANALISIS_S):  # pragma: no cover

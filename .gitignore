@@ -6,3 +6,6 @@ venv/
 .venv/
 emoticontigo.db
 *.db
+# Modelos entrenados (pesan demasiado para GitHub)
+modelos/
+*.zip

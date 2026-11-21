@@ -1,12 +1,13 @@
 import os
 import tempfile
+import time
 import unittest
 
 import numpy as np
 from PIL import Image
 
 from src.camara import (
-    INTERVALO_ANALISIS_S, AnalizadorAula, Camara, DetectorRostros, ErrorCamara,
+    INTERVALO_ANALISIS_S, AnalizadorAula, Camara, DetectorRostros, ErrorCamara, MonitorCamara,
     color_emocion_bgr, COLOR_DEFECTO_BGR, dibujar_resultados, guardar_resultado_cuadro,
     recortar_rostro, resumen_grupo, toca_analizar,
 )
@@ -261,6 +262,109 @@ class TestIntervalo(unittest.TestCase):
     def test_respeta_el_intervalo(self):
         self.assertFalse(toca_analizar(10.0, 10.0 + INTERVALO_ANALISIS_S - 1))
         self.assertTrue(toca_analizar(10.0, 10.0 + INTERVALO_ANALISIS_S))
+
+
+class CapturaInfinita(CapturaFalsa):
+    def read(self):
+        time.sleep(0.005)
+        return True, cuadro_falso()
+
+
+class AnalizadorFalso:
+    def __init__(self, fallar=False):
+        self.llamadas = 0
+        self.fallar = fallar
+
+    def analizar_cuadro(self, cuadro):
+        if self.fallar:
+            raise RuntimeError("fallo del modelo")
+        self.llamadas += 1
+        return {"total_rostros": 0, "rostros": [], "predominante": None, "distribucion": {}}
+
+
+def esperar(condicion, limite=2.0):
+    fin = time.monotonic() + limite
+    while time.monotonic() < fin:
+        if condicion():
+            return True
+        time.sleep(0.01)
+    return False
+
+
+class TestMonitorCamara(unittest.TestCase):
+
+    def crear(self, captura=None, analizador=None, intervalo=5):
+        self.guardados = []
+        self.captura = captura or CapturaFalsa(cuadros=[cuadro_falso(), cuadro_falso()])
+        self.analizador = analizador or AnalizadorFalso()
+        camara = Camara(fabrica=lambda indice: self.captura)
+        return MonitorCamara(camara, self.analizador, intervalo=intervalo, guardar=self.guardados.append)
+
+    def test_sin_cuadro_no_analiza(self):
+        monitor = self.crear()
+        self.assertIsNone(monitor.paso_analisis(ahora=0.0))
+        self.assertEqual(self.analizador.llamadas, 0)
+
+    def test_respeta_el_intervalo(self):
+        monitor = self.crear(intervalo=5)
+        monitor.camara.abrir()
+        monitor.paso_lectura()
+        self.assertIsNotNone(monitor.paso_analisis(ahora=0.0))
+        self.assertIsNone(monitor.paso_analisis(ahora=4.0))
+        self.assertIsNotNone(monitor.paso_analisis(ahora=5.0))
+        self.assertEqual(self.analizador.llamadas, 2)
+        self.assertEqual(len(self.guardados), 2)
+
+    def test_capturar_ahora_no_espera_el_intervalo(self):
+        monitor = self.crear(intervalo=5)
+        monitor.camara.abrir()
+        monitor.paso_lectura()
+        monitor.paso_analisis(ahora=0.0)
+        monitor.capturar_ahora()
+        self.assertIsNotNone(monitor.paso_analisis(ahora=1.0))
+        self.assertIsNone(monitor.paso_analisis(ahora=2.0))
+
+    def test_instantanea(self):
+        monitor = self.crear()
+        self.assertEqual(monitor.instantanea(), (None, None, 0))
+        monitor.camara.abrir()
+        monitor.paso_lectura()
+        monitor.paso_analisis(ahora=0.0)
+        cuadro, resultado, numero = monitor.instantanea()
+        self.assertEqual(cuadro.shape, (ALTO, ANCHO, 3))
+        self.assertEqual(resultado["total_rostros"], 0)
+        self.assertEqual(numero, 1)
+
+    def test_iniciar_analiza_y_detener_cierra_la_camara(self):
+        monitor = self.crear(captura=CapturaInfinita(), intervalo=0)
+        monitor.iniciar()
+        monitor.iniciar()  # una segunda llamada no hace nada
+        self.assertTrue(monitor.activo)
+        self.assertTrue(esperar(lambda: monitor.numero_resultado > 0))
+        monitor.detener()
+        self.assertFalse(monitor.activo)
+        self.assertTrue(self.captura.liberada)
+        self.assertIsNone(monitor.error)
+
+    def test_error_al_leer_detiene_el_monitor(self):
+        monitor = self.crear(captura=CapturaFalsa(cuadros=[]))
+        monitor.iniciar()
+        self.assertTrue(esperar(lambda: not monitor.activo))
+        self.assertIn("no entregó", monitor.error)
+        monitor.detener()
+
+    def test_error_del_modelo_detiene_el_monitor(self):
+        monitor = self.crear(captura=CapturaInfinita(), analizador=AnalizadorFalso(fallar=True), intervalo=0)
+        monitor.iniciar()
+        self.assertTrue(esperar(lambda: not monitor.activo))
+        self.assertEqual(monitor.error, "fallo del modelo")
+        monitor.detener()
+
+    def test_error_si_la_camara_no_abre(self):
+        monitor = self.crear(captura=CapturaFalsa(abre=False))
+        with self.assertRaises(ErrorCamara):
+            monitor.iniciar()
+        self.assertFalse(monitor.activo)
 
 
 if __name__ == "__main__":
