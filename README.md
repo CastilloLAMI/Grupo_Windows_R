@@ -28,7 +28,7 @@ EmotiContigo es una herramienta de **apoyo a la observación docente**. Su alcan
 - Captura imágenes de expresiones faciales de los estudiantes durante la clase.
 - Clasifica las expresiones en 7 emociones (enfadado, asco, miedo, felicidad, tristeza, sorpresa, neutral) con su porcentaje de confianza.
 - Muestra gráficos y estadísticas al docente para apoyar su observación del aula.
-- Guarda un historial de análisis (emoción y confianza) en SQLite para consulta posterior.
+- Guarda un historial de análisis (emoción y confianza) en SQLite, organizado por sesiones de clase, para consulta posterior.
 - Actúa como **intermediario** entre el estudiante y el docente, facilitando la identificación de estados emocionales.
 
 ### Lo que el sistema NO hace (restricciones del alcance)
@@ -53,10 +53,11 @@ El alcance incluye criterios no funcionales verificables mediante pruebas automa
 
 | Restricción del alcance | Prueba que la protege |
 |---|---|
-| No se involucra en el desarrollo del estudiante | `test_la_pagina_web_no_se_involucrara_en_el_desarrollo_del_estudiante` |
+| No se involucra en el desarrollo del estudiante | `test_el_sistema_no_se_involucra_en_el_desarrollo_del_estudiante` |
 | Solo es un intermediario entre estudiante y docente | `test_solo_ser_un_intermediario_entre_el_estudiante_y_el_docente` |
-| No es parte del proceso ni rendimiento académico | `test_la_pagina_web_no_ser_parte_del_proceso_o_rendimiento_academico_del_estudiante` |
+| No es parte del proceso ni rendimiento académico | `test_el_sistema_no_es_parte_del_proceso_o_rendimiento_academico_del_estudiante` |
 | El sistema produce un resultado válido | `test_resultado_esperado` |
+| No almacena imágenes de los rostros | `test_ninguna_tabla_guarda_imagenes` (en `tests/test_historial.py`) |
 
 > **Nota:** estas pruebas se encuentran en `tests/` y se ejecutan con `python -m unittest discover -s tests -v`.
 
@@ -82,7 +83,7 @@ El alcance incluye criterios no funcionales verificables mediante pruebas automa
 ## Instalacion
 ```bash
 git clone https://github.com/CastilloLAMI/Grupo_Windows_R.git
-cd emoticontigo
+cd Grupo_Windows_R
 python -m venv venv
 venv\\Scripts\\activate
 pip install -r requirements.txt
@@ -97,9 +98,69 @@ python -m unittest discover -s tests -v
 - `GET /salud` → estado del servicio.
 - `POST /predecir` → recibe una imagen en el campo `imagen` (jpg/png, máximo 5 MB).
 - `GET /estadisticas` → total de análisis, conteo por emoción y confianza promedio.
-- `GET /historial?limite=50` → últimos análisis (límite entre 1 y 100).
+- `GET /historial?limite=50&sesion_id=3` → últimas detecciones (límite entre 1 y 100); `sesion_id` es opcional.
+- `GET /sesiones` → sesiones de clase con su cantidad de lecturas y detecciones.
+- `GET /estadisticas?sesion_id=3` → estadísticas de una sesión (sin `sesion_id`, de todas).
 
-El historial se guarda en SQLite (`emoticontigo.db`). La ruta se puede cambiar con la variable `EMOTI_BD`.
+`POST /predecir` guarda el análisis en la sesión de clase abierta, si hay una.
+
+## Base de datos
+
+El historial se guarda en **SQLite**, en el archivo `emoticontigo.db` (la ruta se puede cambiar con la variable `EMOTI_BD`). El esquema está en [`db/esquema.sql`](db/esquema.sql) y hay consultas de ejemplo en [`db/consultas.sql`](db/consultas.sql). La aplicación crea las tablas al iniciar.
+
+```mermaid
+erDiagram
+    SESION ||--o{ LECTURA : "tiene"
+    LECTURA ||--o{ DETECCION : "contiene"
+    SESION {
+        int id PK
+        text curso
+        text grado_seccion
+        text docente "opcional"
+        text inicio "UTC"
+        text fin "NULL si está abierta"
+    }
+    LECTURA {
+        int id PK
+        int sesion_id FK "NULL si fue fuera de una sesión"
+        text fecha "UTC"
+        text fuente "camara | imagen | anterior"
+        int total_rostros
+        text predominante
+    }
+    DETECCION {
+        int id PK
+        int lectura_id FK
+        text emocion
+        real confianza "0 a 100"
+        real enfado
+        real asco
+        real miedo
+        real felicidad
+        real tristeza
+        real sorpresa
+        real neutral
+    }
+```
+
+- **sesion:** una clase. Solo puede haber una abierta; si la app se cierra sin terminarla, se retoma al volver a abrirla.
+- **lectura:** cada análisis, de un cuadro de la cámara o de una fotografía. Una lectura de la cámara sin rostros también se guarda (`total_rostros = 0`).
+- **deteccion:** cada rostro de una lectura, con su emoción principal y el porcentaje de las 7 emociones.
+- **Reglas en la base:** claves foráneas con borrado en cascada, `CHECK` para que la emoción sea una de las 7 del modelo, los porcentajes estén entre 0 y 100 y la fuente sea válida, e índices por sesión, fecha y emoción.
+- **Privacidad:** no hay columnas para imágenes ni datos que identifiquen a un estudiante; cada detección es un rostro anónimo. Una prueba verifica que ninguna tabla tenga columnas como `imagen`, `foto` o `rostro`.
+- **Migración:** si existe una base de la versión anterior (tabla `analisis`), sus registros pasan a una sesión «Historial anterior» y la tabla original se conserva como `analisis_v1`.
+
+### ¿Por qué SQLite?
+
+EmotiContigo es una aplicación de escritorio que usa un docente en la PC del aula:
+
+- **Sin instalación ni servidor:** `sqlite3` viene incluido en Python y toda la base es un solo archivo.
+- **Datos seguros:** las transacciones son ACID, así que no se pierden datos si se apaga la PC.
+- **Privacidad:** los datos de los estudiantes no salen de la computadora del aula.
+- **Pruebas y CI:** cada prueba crea una base temporal en un archivo; GitHub Actions no necesita levantar un servidor.
+- **SQL completo:** permite un modelo relacional con claves foráneas, restricciones e índices.
+
+Su límite es la concurrencia: un solo proceso escribe a la vez. Si el sistema creciera a varias aulas guardando en una base central, convendría migrar a PostgreSQL o MySQL; como todo el acceso a datos está en `src/historial.py`, ese cambio quedaría en un solo módulo.
 
 ## Interfaz de escritorio
 ```bash
@@ -107,12 +168,12 @@ python -m src.interfaz
 ```
 Ventana hecha con customtkinter (y `ttk.Treeview` para la tabla del historial), con cuatro pestañas que siguen el mockup de `docs/mockup/`:
 
-- **Clase en vivo:** muestra la cámara con un recuadro y la emoción sobre cada rostro. Se elige la cámara y cada cuánto analizar (5, 10 o 30 s); *Capturar ahora* analiza al momento. A la derecha, el resumen del grupo: rostros detectados, emoción predominante, distribución promedio y últimas lecturas.
-- **Analizar imagen:** analiza una fotografía (jpg o png).
-- **Estadísticas:** total de análisis, emoción más frecuente, confianza promedio y gráfico por emoción.
-- **Historial:** tabla de los últimos 100 análisis con filtro por emoción y exportación a CSV.
+- **Clase en vivo:** primero se inicia una **sesión de clase** (curso, grado y sección, y docente opcional). Luego muestra la cámara con un recuadro y la emoción sobre cada rostro. Se elige la cámara y cada cuánto analizar (5, 10 o 30 s); *Capturar ahora* analiza al momento. A la derecha, el resumen del grupo: rostros detectados, emoción predominante, distribución promedio y últimas lecturas.
+- **Analizar imagen:** analiza una fotografía (jpg o png); si hay una sesión abierta, se guarda en ella.
+- **Estadísticas:** por sesión o de todas: expresiones registradas, lecturas, emoción más frecuente, confianza promedio y gráfico por emoción.
+- **Historial:** tabla de las últimas 100 detecciones (con su sesión y fuente), filtros por sesión y por emoción, y exportación a CSV.
 
-La cámara se lee y se analiza en segundo plano (`MonitorCamara` en `src/camara.py`), así la ventana no se congela mientras trabaja el modelo. Cada lectura guarda un registro por rostro en el historial; las imágenes no se guardan.
+La cámara se lee y se analiza en segundo plano (`MonitorCamara` en `src/camara.py`), así la ventana no se congela mientras trabaja el modelo. Cada lectura se guarda en la sesión abierta, con una detección por rostro; las imágenes no se guardan.
 
 La interfaz reutiliza `DetectorEmociones`. Para usar el modelo ajustado, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors` (por ejemplo `modelos/modelo_emoticontigo`).
 

@@ -33,6 +33,7 @@ ENDPOINTS_PERMITIDOS = (
     "/predecir",
     "/estadisticas",
     "/historial",
+    "/sesiones",
 )
 
 # ============================================================

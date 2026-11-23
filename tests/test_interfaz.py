@@ -51,6 +51,26 @@ class TestFuncionesInterfaz(unittest.TestCase):
         resultado = {"total_rostros": 0, "predominante": None}
         self.assertEqual(interfaz.texto_lectura(resultado, "10:42:25"), "10:42:25  ·  sin rostros")
 
+    def test_textos_de_sesion(self):
+        sesion = {"id": 3, "curso": "Matemática", "grado_seccion": "5.º A", "inicio": "2026-11-21T15:00:00+00:00"}
+        self.assertEqual(interfaz.texto_sesion(sesion), "5.º A · Matemática")
+        self.assertEqual(interfaz.texto_sesion(None), interfaz.SIN_SESION)
+        self.assertTrue(interfaz.etiqueta_sesion(sesion).startswith("#3 · 5.º A · Matemática · "))
+
+    def test_opciones_sesiones(self):
+        sesiones = [
+            {"id": 2, "curso": "Arte", "grado_seccion": "3.º B", "inicio": "2026-11-21T15:00:00+00:00"},
+            {"id": 1, "curso": "Música", "grado_seccion": "3.º B", "inicio": "2026-11-20T15:00:00+00:00"},
+        ]
+        textos, mapa = interfaz.opciones_sesiones(sesiones)
+        self.assertEqual(textos[0], interfaz.TODAS_LAS_SESIONES)
+        self.assertIsNone(mapa[interfaz.TODAS_LAS_SESIONES])
+        self.assertEqual([mapa[texto] for texto in textos[1:]], [2, 1])
+
+    def test_nombre_fuente(self):
+        self.assertEqual(interfaz.nombre_fuente("camara"), "Cámara")
+        self.assertEqual(interfaz.nombre_fuente(None), interfaz.SIN_DATO)
+
 
 if __name__ == "__main__":
     unittest.main()

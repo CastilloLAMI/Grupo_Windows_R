@@ -8,10 +8,10 @@ import numpy as np
 from PIL import Image
 
 try:
-    from src.historial import RUTA_POR_DEFECTO, guardar_analisis, inicializar_bd
+    from src.historial import FUENTE_CAMARA, RUTA_POR_DEFECTO, guardar_lectura, inicializar_bd
     from src.preprocess import EMOCIONES
 except ImportError:  # Permite ejecutar `python src/camara.py`
-    from historial import RUTA_POR_DEFECTO, guardar_analisis, inicializar_bd
+    from historial import FUENTE_CAMARA, RUTA_POR_DEFECTO, guardar_lectura, inicializar_bd
     from preprocess import EMOCIONES
 
 INDICE_CAMARA_DEFECTO = 0
@@ -187,10 +187,9 @@ class AnalizadorAula:
         }
 
 
-def guardar_resultado_cuadro(resultado, ruta=RUTA_POR_DEFECTO):
-    """Guarda en el historial un registro por rostro y devuelve cuántos guardó."""
-    for rostro in resultado["rostros"]:
-        guardar_analisis(rostro, ruta)
+def guardar_resultado_cuadro(resultado, ruta=RUTA_POR_DEFECTO, sesion_id=None):
+    """Guarda la lectura (y una detección por rostro) y devuelve cuántos rostros guardó."""
+    guardar_lectura(resultado, FUENTE_CAMARA, sesion_id, ruta)
     return len(resultado["rostros"])
 
 

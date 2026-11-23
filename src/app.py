@@ -10,7 +10,8 @@ from src.constantes import (
 )
 from src.historial import (
     RUTA_POR_DEFECTO,
-    guardar_analisis, inicializar_bd, listar_historial, obtener_estadisticas,
+    guardar_analisis, inicializar_bd, listar_historial, listar_sesiones, obtener_estadisticas,
+    obtener_sesion, sesion_activa,
 )
 from src.model import DetectorEmociones
 from src.preprocess import validar_extension
@@ -18,6 +19,7 @@ from src import alcance
 
 CAMPO_IMAGEN = "imagen"
 HTTP_SOLICITUD_INVALIDA = 400
+HTTP_NO_ENCONTRADO = 404
 HTTP_ENTIDAD_DEMASIADO_GRANDE = 413
 MENSAJE_IMAGEN_INVALIDA = "El archivo no es una imagen válida"
 
@@ -41,6 +43,20 @@ def abrir_imagen(archivo):
         return imagen.convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError) as error:
         raise ValueError(MENSAJE_IMAGEN_INVALIDA) from error
+
+
+def leer_sesion_id(argumentos, ruta_bd):
+    """Lee `sesion_id` de la consulta: None si no viene; ValueError o LookupError si no sirve."""
+    texto = argumentos.get("sesion_id")
+    if texto is None:
+        return None
+    try:
+        sesion_id = int(texto)
+    except ValueError as error:
+        raise ValueError("sesion_id debe ser un número entero") from error
+    if obtener_sesion(sesion_id, ruta_bd) is None:
+        raise LookupError(f"No existe la sesión {sesion_id}")
+    return sesion_id
 
 
 def crear_app(detector=None, ruta_bd=None):
@@ -77,12 +93,29 @@ def crear_app(detector=None, ruta_bd=None):
         if violaciones_resp:
             return jsonify({"error": "Respuesta fuera de alcance", "detalle": violaciones_resp}), 500
 
-        guardar_analisis(resultado, app.config["RUTA_BD"])
+        activa = sesion_activa(app.config["RUTA_BD"])
+        guardar_analisis(resultado, app.config["RUTA_BD"], sesion_id=activa["id"] if activa else None)
         return jsonify(resultado)
+
+    def sesion_de_la_consulta():
+        """Devuelve (sesion_id, None) o (None, respuesta de error)."""
+        try:
+            return leer_sesion_id(request.args, app.config["RUTA_BD"]), None
+        except ValueError as error:
+            return None, (jsonify({"error": str(error)}), HTTP_SOLICITUD_INVALIDA)
+        except LookupError as error:
+            return None, (jsonify({"error": str(error)}), HTTP_NO_ENCONTRADO)
 
     @app.get("/estadisticas")
     def estadisticas():
-        return jsonify(obtener_estadisticas(app.config["RUTA_BD"]))
+        sesion_id, error = sesion_de_la_consulta()
+        if error:
+            return error
+        return jsonify(obtener_estadisticas(app.config["RUTA_BD"], sesion_id=sesion_id))
+
+    @app.get("/sesiones")
+    def sesiones():
+        return jsonify(listar_sesiones(app.config["RUTA_BD"]))
 
     @app.get("/historial")
     def historial():
@@ -99,7 +132,10 @@ def crear_app(detector=None, ruta_bd=None):
                 f"El límite debe estar entre {LIMITE_HISTORIAL_MIN} y {LIMITE_HISTORIAL_MAX}"
             )
             return jsonify({"error": mensaje}), HTTP_SOLICITUD_INVALIDA
-        return jsonify(listar_historial(app.config["RUTA_BD"], limite))
+        sesion_id, error = sesion_de_la_consulta()
+        if error:
+            return error
+        return jsonify(listar_historial(app.config["RUTA_BD"], limite, sesion_id=sesion_id))
 
     return app
 

@@ -29,7 +29,7 @@ class TestAlcance(unittest.TestCase):
 
     # ---------- Restricciones del alcance ----------
 
-    def test_la_pagina_web_no_se_involucrara_en_el_desarrollo_del_estudiante(self):
+    def test_el_sistema_no_se_involucra_en_el_desarrollo_del_estudiante(self):
         """No existen rutas que intervengan en el desarrollo del estudiante."""
         for ruta in alcance.RUTAS_PROHIBIDAS:
             self.assertFalse(
@@ -45,7 +45,7 @@ class TestAlcance(unittest.TestCase):
         respuesta_mala = {"resultado": "el niño aprendió"}
         self.assertTrue(alcance.validar_respuesta(str(respuesta_mala)))
 
-    def test_la_pagina_web_no_ser_parte_del_proceso_o_rendimiento_academico_del_estudiante(self):
+    def test_el_sistema_no_es_parte_del_proceso_o_rendimiento_academico_del_estudiante(self):
         """No hay endpoints de calificación ni de rendimiento."""
         rutas_prohibidas = ["/calificar", "/evaluar", "/nota", "/rendimiento"]
         for ruta in rutas_prohibidas:
