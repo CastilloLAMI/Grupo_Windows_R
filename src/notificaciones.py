@@ -4,7 +4,7 @@ import threading
 import urllib.parse
 import urllib.request
 
-EMOCIONES_ALERTA = {"tristeza", "miedo", "enfadado"}
+EMOCIONES_ALERTA = {"tristeza", "miedo", "enfado"}
 UMBRAL_CONFIANZA = 70.0
 
 
