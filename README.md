@@ -78,7 +78,10 @@ El alcance incluye criterios no funcionales verificables mediante pruebas automa
 - **Framework:** flask
 - **ML:** Hugging Face Transformers
 - **Testing:** unittest + TDD
-- **CI/CD:** GitHub Actions
+- **Interfaz:** customtkinter + ttk, OpenCV para la cámara
+- **Base de datos:** SQLite
+- **Despliegue:** Docker y Docker Compose (gunicorn)
+- **CI/CD:** GitHub Actions (pruebas, lint y construcción de la imagen Docker)
 
 ## Instalacion
 ```bash
@@ -94,7 +97,52 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
+## Docker
+
+El contenedor ejecuta la **API Flask con el modelo de IA** y una **página web de demostración** en `http://localhost:5000`, donde se sube una foto, se ve la emoción detectada y se consultan las estadísticas y el historial.
+
+### Requisitos
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows o Mac) o Docker Engine (Linux).
+- La primera construcción descarga PyTorch y el modelo (unos 700 MB; la imagen ocupa alrededor de 2,4 GB en disco) y tarda varios minutos. Las siguientes reutilizan la caché.
+
+### Con Docker Compose (recomendado)
+```bash
+docker compose up --build        # construye la imagen y levanta el servicio
+# abrir http://localhost:5000
+docker compose logs -f           # ver los registros
+docker compose down              # detener (los datos se conservan en el volumen emoti-datos)
+```
+
+### Solo con Docker
+```bash
+docker build -t emoticontigo .
+docker run -d --name emoticontigo -p 5000:5000 -v emoti-datos:/datos emoticontigo
+docker ps                        # la columna STATUS debe decir (healthy)
+```
+
+### Qué hace el Dockerfile
+| Paso | Por qué |
+|---|---|
+| `FROM python:3.11-slim` | Imagen base liviana con Python. |
+| Copia `requirements-docker.txt` e instala dependencias **antes** del código | Docker reutiliza esa capa si solo cambia el código; reconstruir tarda segundos. |
+| PyTorch **solo CPU** | La imagen pesa unos 2 GB menos que con CUDA; el aula no tiene GPU. |
+| Usuario `emoti` (uid 1000), no root | Seguridad: el proceso no tiene privilegios de administrador. |
+| Descarga el modelo al construir (`DESCARGAR_MODELO=1`) y activa `HF_HUB_OFFLINE` | El contenedor funciona **sin internet** durante la demostración. |
+| `VOLUME /datos` con `EMOTI_BD=/datos/emoticontigo.db` | La base SQLite sobrevive a reinicios y reconstrucciones del contenedor. |
+| `EMOTI_PRECARGAR=1` | El modelo se carga al arrancar: el primer análisis no espera. |
+| `HEALTHCHECK` contra `/salud` | Docker sabe si la API responde (`healthy`). |
+| `gunicorn` con 1 proceso y 4 hilos | Servidor de producción; el modelo se carga una sola vez en memoria. |
+
+### Opciones
+- **Modelo ajustado:** descomprime `modelo_emoticontigo.zip` en `modelos/` y descomenta `EMOTI_MODELO` en `docker-compose.yml`. La carpeta se monta en solo lectura.
+- **Imagen más liviana:** `docker build --build-arg DESCARGAR_MODELO=0 -t emoticontigo .` (el modelo se descarga al primer uso; necesita internet).
+- **Pruebas:** el job `docker` de GitHub Actions construye la imagen, levanta el contenedor, espera a que esté `healthy`, analiza una imagen y comprueba que los datos sobreviven a un reinicio.
+
+### Por qué la app de escritorio no va en el contenedor
+La interfaz Tkinter y la cámara necesitan la pantalla y la cámara USB de la PC. En Windows y Mac, Docker Desktop no puede pasar la cámara USB a un contenedor ni mostrar ventanas sin instalar un servidor gráfico aparte. Por eso el contenedor lleva la parte portable (API, modelo, base de datos y página web) y la app de escritorio se ejecuta en la PC del aula con `python -m src.interfaz`.
+
 ## API
+- `GET /` → página web de demostración.
 - `GET /salud` → estado del servicio.
 - `POST /predecir` → recibe una imagen en el campo `imagen` (jpg/png, máximo 5 MB).
 - `GET /estadisticas` → total de análisis, conteo por emoción y confianza promedio.

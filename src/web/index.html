@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EmotiContigo</title>
+<style>
+  :root {
+    --fondo: #EEF3F0; --panel: #FFFFFF; --encabezado: #183B30; --pildora: #2A5546;
+    --texto: #1F2D27; --suave: #52665C; --seccion: #4A6558; --pista: #E3EAE6;
+    --borde: #D5E0DA; --boton: #1E7F5E; --boton-hover: #155C44; --error: #B03A2E;
+    --vista: #E8EFEB;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Inter, system-ui, sans-serif; background: var(--fondo); color: var(--texto); }
+  header { background: var(--encabezado); color: #fff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  header h1 { margin: 0; font-size: 24px; letter-spacing: .5px; }
+  header p { margin: 2px 0 0; font-size: 13px; color: #D0E5DB; }
+  .pildoras { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pildora { background: var(--pildora); padding: 6px 12px; border-radius: 999px; font-size: 12px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  section.ancho { grid-column: 1 / -1; }
+  h2 { margin: 0; font-size: 17px; }
+  .etiqueta { font-size: 11px; font-weight: 700; letter-spacing: .8px; color: var(--seccion); text-transform: uppercase; }
+  .vista { background: var(--vista); border: 2px dashed #A9BDB3; border-radius: 12px; min-height: 220px; display: flex; align-items: center; justify-content: center; color: var(--suave); text-align: center; overflow: hidden; }
+  .vista img { max-width: 100%; max-height: 300px; display: block; }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  button, .boton { font: inherit; font-weight: 700; font-size: 13px; min-height: 42px; padding: 0 18px; border-radius: 10px; border: none; background: var(--boton); color: #fff; cursor: pointer; display: inline-flex; align-items: center; }
+  button:hover, .boton:hover { background: var(--boton-hover); }
+  button:disabled { background: var(--pista); color: var(--suave); cursor: default; }
+  .boton.secundario { background: var(--pista); color: var(--texto); }
+  input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  input[type=file]:focus + .boton { outline: 3px solid #8FC7B1; }
+  label.campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--suave); }
+  select { font: inherit; font-size: 13px; height: 38px; padding: 0 10px; border: 1px solid var(--borde); border-radius: 8px; background: #fff; color: var(--texto); min-width: 260px; }
+  .tarjeta { background: var(--vista); border-radius: 12px; padding: 16px; }
+  .tarjeta .valor { font-size: 28px; font-weight: 700; }
+  .tarjeta.resultado { color: #fff; }
+  .tarjeta.resultado .etiqueta { color: #fff; }
+  .barra { display: grid; grid-template-columns: 90px 1fr 70px; gap: 10px; align-items: center; font-size: 13px; }
+  .barra .pista { height: 10px; background: var(--pista); border-radius: 5px; overflow: hidden; }
+  .barra .relleno { height: 10px; border-radius: 5px; }
+  .barra .num { text-align: right; color: var(--suave); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .mensaje { font-size: 13px; color: var(--suave); min-height: 18px; }
+  .mensaje.error { color: var(--error); font-weight: 600; }
+  .tabla { overflow-x: auto; border: 1px solid var(--borde); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 13px; }
+  th { text-align: left; background: var(--vista); color: var(--seccion); font-size: 12px; padding: 10px 12px; }
+  td { padding: 9px 12px; border-top: 1px solid var(--pista); }
+  tr:nth-child(even) td { background: #F7FAF8; }
+  footer { max-width: 1200px; margin: 0 auto; padding: 0 24px 24px; font-size: 12px; color: var(--suave); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>EMOTICONTIGO</h1>
+    <p>Apoyo al docente para observar expresiones faciales</p>
+  </div>
+  <div class="pildoras">
+    <span class="pildora" id="estado-servidor">Conectando con la API…</span>
+    <span class="pildora" id="estado-sesion">Sin sesión activa</span>
+  </div>
+</header>
+
+<main>
+  <section aria-labelledby="titulo-analizar">
+    <h2 id="titulo-analizar">Analizar una fotografía</h2>
+    <div class="vista" id="vista">Selecciona una fotografía del rostro<br>(jpg o png, máximo 5 MB)</div>
+    <div class="fila">
+      <input type="file" id="archivo" accept=".jpg,.jpeg,.png">
+      <label for="archivo" class="boton secundario">Seleccionar imagen</label>
+      <button type="button" id="analizar" disabled>Analizar</button>
+    </div>
+    <p class="mensaje" id="mensaje-analisis" role="status" aria-live="polite"></p>
+  </section>
+
+  <section aria-labelledby="titulo-resultado">
+    <h2 id="titulo-resultado">Resultado</h2>
+    <div class="tarjeta" id="tarjeta-resultado">
+      <div class="etiqueta">Expresión principal</div>
+      <div class="valor" id="resultado-emocion">Esperando análisis</div>
+      <div id="resultado-confianza"></div>
+    </div>
+    <div class="etiqueta">Distribución de expresiones</div>
+    <div id="distribucion" style="display: grid; gap: 8px"></div>
+  </section>
+
+  <section class="ancho" aria-labelledby="titulo-estadisticas">
+    <div class="fila" style="justify-content: space-between">
+      <h2 id="titulo-estadisticas">Estadísticas</h2>
+      <label class="campo">Sesión
+        <select id="sesion"><option value="">Todas las sesiones</option></select>
+      </label>
+    </div>
+    <div class="kpis">
+      <div class="tarjeta"><div class="etiqueta">Expresiones registradas</div><div class="valor" id="kpi-total">—</div></div>
+      <div class="tarjeta"><div class="etiqueta">Lecturas</div><div class="valor" id="kpi-lecturas">—</div></div>
+      <div class="tarjeta"><div class="etiqueta">Más frecuente</div><div class="valor" id="kpi-frecuente">—</div></div>
+      <div class="tarjeta"><div class="etiqueta">Confianza promedio</div><div class="valor" id="kpi-promedio">—</div></div>
+    </div>
+    <div id="grafico" style="display: grid; gap: 8px"></div>
+  </section>
+
+  <section class="ancho" aria-labelledby="titulo-historial">
+    <div class="fila" style="justify-content: space-between">
+      <h2 id="titulo-historial">Últimos análisis</h2>
+      <button type="button" class="boton secundario" id="actualizar">Actualizar</button>
+    </div>
+    <div class="tabla">
+      <table>
+        <thead><tr><th scope="col">Fecha y hora</th><th scope="col">Sesión</th><th scope="col">Fuente</th><th scope="col">Emoción</th><th scope="col">Confianza</th></tr></thead>
+        <tbody id="historial"><tr><td colspan="5">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  La expresión es una señal de apoyo; no mide si el estudiante aprendió. No se guardan fotografías: solo la emoción y la confianza.
+</footer>
+
+<script>
+  const EMOCIONES = ["enfado", "asco", "miedo", "felicidad", "tristeza", "sorpresa", "neutral"];
+  const COLORES = { enfado: "#D64545", asco: "#6E8B2E", miedo: "#7B5EA7", felicidad: "#E0A100",
+                    tristeza: "#3B7DD8", sorpresa: "#E07B39", neutral: "#7D8F87" };
+  const FUENTES = { camara: "Cámara", imagen: "Imagen", anterior: "Historial anterior" };
+  const $ = (id) => document.getElementById(id);
+  const nombre = (e) => e ? e.charAt(0).toUpperCase() + e.slice(1) : "—";
+  const porcentaje = (v) => `${Number(v).toFixed(2)} %`;
+  let sesiones = [];
+
+  function crear(etiqueta, texto, clase) {
+    const elemento = document.createElement(etiqueta);
+    if (texto !== undefined) elemento.textContent = texto;
+    if (clase) elemento.className = clase;
+    return elemento;
+  }
+
+  function barra(contenedor, emocion, valor, maximo, texto) {
+    const fila = crear("div", undefined, "barra");
+    fila.append(crear("span", nombre(emocion)));
+    const pista = crear("div", undefined, "pista");
+    const relleno = crear("div", undefined, "relleno");
+    relleno.style.width = `${maximo ? (valor / maximo) * 100 : 0}%`;
+    relleno.style.background = COLORES[emocion] || "#1E7F5E";
+    pista.append(relleno);
+    fila.append(pista, crear("span", texto, "num"));
+    contenedor.append(fila);
+  }
+
+  async function pedir(url, opciones) {
+    const respuesta = await fetch(url, opciones);
+    const datos = await respuesta.json().catch(() => ({}));
+    if (!respuesta.ok) throw new Error(datos.error || `Error ${respuesta.status}`);
+    return datos;
+  }
+
+  function mostrarMensaje(texto, esError) {
+    const mensaje = $("mensaje-analisis");
+    mensaje.textContent = texto;
+    mensaje.classList.toggle("error", Boolean(esError));
+  }
+
+  $("archivo").addEventListener("change", () => {
+    const archivo = $("archivo").files[0];
+    $("analizar").disabled = !archivo;
+    if (!archivo) return;
+    const imagen = document.createElement("img");
+    imagen.alt = "Fotografía seleccionada";
+    imagen.src = URL.createObjectURL(archivo);
+    $("vista").replaceChildren(imagen);
+    mostrarMensaje(archivo.name);
+  });
+
+  $("analizar").addEventListener("click", async () => {
+    const formulario = new FormData();
+    formulario.append("imagen", $("archivo").files[0]);
+    $("analizar").disabled = true;
+    mostrarMensaje("Analizando…");
+    try {
+      const resultado = await pedir("/predecir", { method: "POST", body: formulario });
+      mostrarResultado(resultado);
+      mostrarMensaje("Análisis completado y guardado en el historial");
+      actualizarTodo();
+    } catch (error) {
+      mostrarMensaje(error.message, true);
+    } finally {
+      $("analizar").disabled = false;
+    }
+  });
+
+  function mostrarResultado(resultado) {
+    const tarjeta = $("tarjeta-resultado");
+    tarjeta.classList.add("resultado");
+    tarjeta.style.background = COLORES[resultado.emocion] || "#1E7F5E";
+    $("resultado-emocion").textContent = nombre(resultado.emocion);
+    $("resultado-confianza").textContent = `Confianza: ${porcentaje(resultado.confianza)}`;
+    const distribucion = $("distribucion");
+    distribucion.replaceChildren();
+    Object.entries(resultado.todas).sort((a, b) => b[1] - a[1])
+      .forEach(([emocion, valor]) => barra(distribucion, emocion, valor, 100, porcentaje(valor)));
+  }
+
+  function consultaSesion(prefijo) {
+    const id = $("sesion").value;
+    return id ? `${prefijo}sesion_id=${id}` : "";
+  }
+
+  async function cargarSesiones() {
+    sesiones = await pedir("/sesiones");
+    const elegida = $("sesion").value;
+    const opciones = [new Option("Todas las sesiones", "")];
+    sesiones.forEach((s) => opciones.push(new Option(`#${s.id} · ${s.grado_seccion} · ${s.curso}${s.activa ? " (en curso)" : ""}`, s.id)));
+    $("sesion").replaceChildren(...opciones);
+    $("sesion").value = sesiones.some((s) => String(s.id) === elegida) ? elegida : "";
+    const activa = sesiones.find((s) => s.activa);
+    $("estado-sesion").textContent = activa ? `Sesión: ${activa.grado_seccion} · ${activa.curso}` : "Sin sesión activa";
+  }
+
+  async function cargarEstadisticas() {
+    const datos = await pedir(`/estadisticas${consultaSesion("?")}`);
+    $("kpi-total").textContent = datos.total;
+    $("kpi-lecturas").textContent = datos.lecturas;
+    const frecuente = datos.total ? EMOCIONES.reduce((a, b) => (datos.por_emocion[b] > datos.por_emocion[a] ? b : a)) : null;
+    $("kpi-frecuente").textContent = nombre(frecuente);
+    $("kpi-promedio").textContent = datos.total ? porcentaje(datos.promedio_confianza) : "—";
+    const grafico = $("grafico");
+    grafico.replaceChildren();
+    const maximo = Math.max(1, ...EMOCIONES.map((e) => datos.por_emocion[e]));
+    EMOCIONES.forEach((e) => barra(grafico, e, datos.por_emocion[e], maximo, String(datos.por_emocion[e])));
+  }
+
+  async function cargarHistorial() {
+    const registros = await pedir(`/historial?limite=20${consultaSesion("&")}`);
+    const cuerpo = $("historial");
+    cuerpo.replaceChildren();
+    if (!registros.length) {
+      const fila = crear("tr");
+      const celda = crear("td", "Aún no hay análisis registrados");
+      celda.colSpan = 5;
+      fila.append(celda);
+      cuerpo.append(fila);
+      return;
+    }
+    const nombresSesion = Object.fromEntries(sesiones.map((s) => [s.id, `#${s.id} · ${s.grado_seccion}`]));
+    registros.forEach((r) => {
+      const fila = crear("tr");
+      fila.append(
+        crear("td", new Date(r.fecha).toLocaleString("es-PE")),
+        crear("td", nombresSesion[r.sesion_id] || "—"),
+        crear("td", FUENTES[r.fuente] || r.fuente),
+        crear("td", nombre(r.emocion)),
+        crear("td", porcentaje(r.confianza)),
+      );
+      cuerpo.append(fila);
+    });
+  }
+
+  async function actualizarTodo() {
+    try {
+      await pedir("/salud");
+      $("estado-servidor").textContent = "● API conectada";
+      await cargarSesiones();
+      await Promise.all([cargarEstadisticas(), cargarHistorial()]);
+    } catch (error) {
+      $("estado-servidor").textContent = "API no disponible";
+    }
+  }
+
+  $("sesion").addEventListener("change", () => Promise.all([cargarEstadisticas(), cargarHistorial()]));
+  $("actualizar").addEventListener("click", actualizarTodo);
+  actualizarTodo();
+</script>
+</body>
+</html>
