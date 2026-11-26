@@ -46,6 +46,7 @@ class TestApi(unittest.TestCase):
         self.assertIn("/estadisticas", rutas)
         self.assertIn("/historial", rutas)
         self.assertIn("/sesiones", rutas)
+        self.assertIn("/", rutas)
 
     def test_predecir_ok(self):
         respuesta = self.cliente.post("/predecir", data=imagen_png())
@@ -166,6 +167,46 @@ class TestApi(unittest.TestCase):
                 respuesta = self.cliente.get(f"{ruta}?sesion_id=999")
                 self.assertEqual(respuesta.status_code, 404)
                 self.assertIn("999", respuesta.get_json()["error"])
+
+    def test_pagina_de_inicio(self):
+        respuesta = self.cliente.get("/")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("text/html", respuesta.content_type)
+        html = respuesta.get_data(as_text=True)
+        respuesta.close()
+        self.assertIn("EMOTICONTIGO", html)
+        for ruta in ("/predecir", "/estadisticas", "/historial", "/sesiones"):
+            self.assertIn(ruta, html)
+
+
+class TestPrecarga(unittest.TestCase):
+    """En Docker (EMOTI_PRECARGAR=1) el modelo se carga al crear la app."""
+
+    class DetectorContado(DetectorFalso):
+        def __init__(self):
+            self.cargas = 0
+
+        def cargar(self):
+            self.cargas += 1
+
+    def setUp(self):
+        self.carpeta = tempfile.TemporaryDirectory()
+        self.ruta_bd = os.path.join(self.carpeta.name, "precarga.db")
+
+    def tearDown(self):
+        self.carpeta.cleanup()
+
+    def test_precarga_con_la_variable(self):
+        detector = self.DetectorContado()
+        with mock.patch.dict(os.environ, {"EMOTI_PRECARGAR": "1"}):
+            crear_app(detector=detector, ruta_bd=self.ruta_bd)
+        self.assertEqual(detector.cargas, 1)
+
+    def test_sin_la_variable_no_precarga(self):
+        detector = self.DetectorContado()
+        with mock.patch.dict(os.environ, {"EMOTI_PRECARGAR": "0"}):
+            crear_app(detector=detector, ruta_bd=self.ruta_bd)
+        self.assertEqual(detector.cargas, 0)
 
 
 if __name__ == "__main__":

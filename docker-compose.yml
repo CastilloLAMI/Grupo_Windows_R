@@ -1,0 +1,26 @@
+# EmotiContigo con Docker Compose
+#
+#   docker compose up --build      -> construye la imagen y levanta el servicio
+#   http://localhost:5000          -> página de demostración
+#   docker compose down            -> detiene el servicio (los datos se conservan)
+services:
+  emoticontigo:
+    build:
+      context: .
+      args:
+        DESCARGAR_MODELO: "1"
+    image: emoticontigo:latest
+    container_name: emoticontigo
+    ports:
+      - "5000:5000"
+    environment:
+      EMOTI_BD: /datos/emoticontigo.db
+      # Para usar el modelo ajustado, descomprímelo en ./modelos y descomenta:
+      # EMOTI_MODELO: /app/modelos/modelo_emoticontigo
+    volumes:
+      - emoti-datos:/datos
+      - ./modelos:/app/modelos:ro
+    restart: unless-stopped
+
+volumes:
+  emoti-datos:
