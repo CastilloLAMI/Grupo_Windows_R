@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EmotiContigo</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
     --fondo: #EEF3F0; --panel: #FFFFFF; --encabezado: #183B30; --pildora: #2A5546;
     --texto: #1F2D27; --suave: #52665C; --seccion: #4A6558; --pista: #E3EAE6;
     --borde: #D5E0DA; --boton: #1E7F5E; --boton-hover: #155C44; --error: #B03A2E;
-    --vista: #E8EFEB;
+    --vista: #E8EFEB; --video: #20302A;
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Segoe UI", Inter, system-ui, sans-serif; background: var(--fondo); color: var(--texto); }
@@ -18,40 +19,58 @@
   header p { margin: 2px 0 0; font-size: 13px; color: #D0E5DB; }
   .pildoras { display: flex; gap: 8px; flex-wrap: wrap; }
   .pildora { background: var(--pildora); padding: 6px 12px; border-radius: 999px; font-size: 12px; }
-  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  nav { display: flex; justify-content: center; gap: 4px; padding: 16px 24px 0; flex-wrap: wrap; }
+  nav button { background: var(--pista); color: var(--texto); }
+  nav button[aria-selected="true"] { background: var(--boton); color: #fff; }
+  main { max-width: 1240px; margin: 0 auto; padding: 16px 24px; }
+  .pestana { display: grid; gap: 16px; }
+  .pestana[hidden] { display: none; }
+  .dos { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+  .mitades { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .dos, .mitades { grid-template-columns: 1fr; } }
   section { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  section.ancho { grid-column: 1 / -1; }
   h2 { margin: 0; font-size: 17px; }
   .etiqueta { font-size: 11px; font-weight: 700; letter-spacing: .8px; color: var(--seccion); text-transform: uppercase; }
-  .vista { background: var(--vista); border: 2px dashed #A9BDB3; border-radius: 12px; min-height: 220px; display: flex; align-items: center; justify-content: center; color: var(--suave); text-align: center; overflow: hidden; }
-  .vista img { max-width: 100%; max-height: 300px; display: block; }
   .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
-  button, .boton { font: inherit; font-weight: 700; font-size: 13px; min-height: 42px; padding: 0 18px; border-radius: 10px; border: none; background: var(--boton); color: #fff; cursor: pointer; display: inline-flex; align-items: center; }
-  button:hover, .boton:hover { background: var(--boton-hover); }
-  button:disabled { background: var(--pista); color: var(--suave); cursor: default; }
-  .boton.secundario { background: var(--pista); color: var(--texto); }
+  .fila[hidden] { display: none; }
+  .entre { justify-content: space-between; align-items: center; }
+  button, .boton { font: inherit; font-weight: 700; font-size: 13px; min-height: 42px; padding: 0 18px; border-radius: 10px; border: none; background: var(--boton); color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  button:hover:not(:disabled), .boton:hover { background: var(--boton-hover); color: #fff; }
+  button:disabled { background: var(--pista); color: #6B7D74; cursor: default; }
+  .secundario { background: var(--pista); color: var(--texto); }
+  label.campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--suave); }
+  input[type=text], select { font: inherit; font-size: 13px; height: 38px; padding: 0 10px; border: 1px solid var(--borde); border-radius: 8px; background: #fff; color: var(--texto); }
+  input[type=text] { width: 210px; }
+  select.ancho { min-width: 280px; }
   input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
   input[type=file]:focus + .boton { outline: 3px solid #8FC7B1; }
-  label.campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--suave); }
-  select { font: inherit; font-size: 13px; height: 38px; padding: 0 10px; border: 1px solid var(--borde); border-radius: 8px; background: #fff; color: var(--texto); min-width: 260px; }
-  .tarjeta { background: var(--vista); border-radius: 12px; padding: 16px; }
-  .tarjeta .valor { font-size: 28px; font-weight: 700; }
-  .tarjeta.resultado { color: #fff; }
-  .tarjeta.resultado .etiqueta { color: #fff; }
+  .estado-camara { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: var(--pista); color: var(--suave); }
+  .estado-camara.vivo { background: var(--boton); color: #fff; }
+  .lienzo { position: relative; background: var(--video); border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; color: #A9BDB3; text-align: center; padding: 16px; }
+  .lienzo video, .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .lienzo video[hidden] { display: none; }
+  .vista { background: var(--vista); border: 2px dashed #A9BDB3; border-radius: 12px; min-height: 240px; display: flex; align-items: center; justify-content: center; color: var(--suave); text-align: center; overflow: hidden; }
+  .vista img { max-width: 100%; max-height: 320px; display: block; }
+  .tarjeta { background: var(--vista); border-radius: 12px; padding: 14px 16px; }
+  .tarjeta .valor { font-size: 26px; font-weight: 700; }
+  .tarjeta.color { color: #fff; }
+  .tarjeta.color .etiqueta { color: #fff; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .barras { display: grid; gap: 8px; }
   .barra { display: grid; grid-template-columns: 90px 1fr 70px; gap: 10px; align-items: center; font-size: 13px; }
   .barra .pista { height: 10px; background: var(--pista); border-radius: 5px; overflow: hidden; }
   .barra .relleno { height: 10px; border-radius: 5px; }
   .barra .num { text-align: right; color: var(--suave); }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .mensaje { font-size: 13px; color: var(--suave); min-height: 18px; }
+  .mensaje { font-size: 13px; color: var(--suave); min-height: 18px; margin: 0; }
   .mensaje.error { color: var(--error); font-weight: 600; }
+  ul.lecturas { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+  ul.lecturas li { padding: 6px 0; border-top: 1px solid var(--pista); }
   .tabla { overflow-x: auto; border: 1px solid var(--borde); border-radius: 10px; }
-  table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; font-size: 13px; }
   th { text-align: left; background: var(--vista); color: var(--seccion); font-size: 12px; padding: 10px 12px; }
   td { padding: 9px 12px; border-top: 1px solid var(--pista); }
   tr:nth-child(even) td { background: #F7FAF8; }
-  footer { max-width: 1200px; margin: 0 auto; padding: 0 24px 24px; font-size: 12px; color: var(--suave); }
+  footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 24px; font-size: 12px; color: var(--suave); }
 </style>
 </head>
 <body>
@@ -61,62 +80,144 @@
     <p>Apoyo al docente para observar expresiones faciales</p>
   </div>
   <div class="pildoras">
-    <span class="pildora" id="estado-servidor">Conectando con la API…</span>
     <span class="pildora" id="estado-sesion">Sin sesión activa</span>
+    <span class="pildora" id="estado-servidor">Conectando con la API…</span>
   </div>
 </header>
 
+<nav role="tablist" aria-label="Secciones">
+  <button type="button" role="tab" id="tab-vivo" aria-controls="panel-vivo" aria-selected="true">Clase en vivo</button>
+  <button type="button" role="tab" id="tab-imagen" aria-controls="panel-imagen" aria-selected="false">Analizar imagen</button>
+  <button type="button" role="tab" id="tab-estadisticas" aria-controls="panel-estadisticas" aria-selected="false">Estadísticas</button>
+  <button type="button" role="tab" id="tab-historial" aria-controls="panel-historial" aria-selected="false">Historial</button>
+</nav>
+
 <main>
-  <section aria-labelledby="titulo-analizar">
-    <h2 id="titulo-analizar">Analizar una fotografía</h2>
-    <div class="vista" id="vista">Selecciona una fotografía del rostro<br>(jpg o png, máximo 5 MB)</div>
-    <div class="fila">
-      <input type="file" id="archivo" accept=".jpg,.jpeg,.png">
-      <label for="archivo" class="boton secundario">Seleccionar imagen</label>
-      <button type="button" id="analizar" disabled>Analizar</button>
-    </div>
-    <p class="mensaje" id="mensaje-analisis" role="status" aria-live="polite"></p>
-  </section>
+  <!-- ===================== Clase en vivo ===================== -->
+  <div class="pestana" role="tabpanel" id="panel-vivo" aria-labelledby="tab-vivo">
+    <section aria-label="Sesión de clase">
+      <form class="fila" id="form-sesion">
+        <strong style="align-self: center">Nueva sesión de clase</strong>
+        <label class="campo">Curso <input type="text" id="curso" placeholder="ej. Matemática" required></label>
+        <label class="campo">Grado y sección <input type="text" id="grado" placeholder="ej. 5.º A" required></label>
+        <label class="campo">Docente (opcional) <input type="text" id="docente"></label>
+        <button type="submit">Iniciar sesión</button>
+      </form>
+      <div class="fila entre" id="resumen-sesion" hidden>
+        <strong id="texto-sesion"></strong>
+        <button type="button" class="secundario" id="cerrar-sesion">Cerrar sesión</button>
+      </div>
+      <p class="mensaje" id="mensaje-sesion" role="status" aria-live="polite"></p>
+    </section>
 
-  <section aria-labelledby="titulo-resultado">
-    <h2 id="titulo-resultado">Resultado</h2>
-    <div class="tarjeta" id="tarjeta-resultado">
-      <div class="etiqueta">Expresión principal</div>
-      <div class="valor" id="resultado-emocion">Esperando análisis</div>
-      <div id="resultado-confianza"></div>
-    </div>
-    <div class="etiqueta">Distribución de expresiones</div>
-    <div id="distribucion" style="display: grid; gap: 8px"></div>
-  </section>
+    <div class="dos">
+      <section aria-labelledby="titulo-camara">
+        <div class="fila entre">
+          <h2 id="titulo-camara">Cámara del aula</h2>
+          <span class="estado-camara" id="estado-camara">Detenida</span>
+        </div>
+        <div class="lienzo" id="lienzo">
+          <span id="aviso-camara">Inicia una sesión de clase para usar la cámara.</span>
+          <video id="video" autoplay playsinline muted hidden></video>
+          <canvas id="recuadros" aria-hidden="true"></canvas>
+        </div>
+        <div class="fila">
+          <label class="campo">Cámara <select id="camara"><option value="">Cámara predeterminada</option></select></label>
+          <label class="campo">Analizar cada
+            <select id="intervalo"><option value="5">5 segundos</option><option value="10">10 segundos</option><option value="30">30 segundos</option></select>
+          </label>
+        </div>
+        <div class="fila">
+          <button type="button" id="iniciar-camara" disabled>Iniciar cámara</button>
+          <button type="button" class="secundario" id="detener-camara" disabled>Detener</button>
+          <button type="button" class="secundario" id="capturar" disabled>Capturar ahora</button>
+        </div>
+        <p class="mensaje" id="mensaje-camara" role="status" aria-live="polite"></p>
+      </section>
 
-  <section class="ancho" aria-labelledby="titulo-estadisticas">
-    <div class="fila" style="justify-content: space-between">
-      <h2 id="titulo-estadisticas">Estadísticas</h2>
-      <label class="campo">Sesión
-        <select id="sesion"><option value="">Todas las sesiones</option></select>
-      </label>
+      <section aria-labelledby="titulo-grupo">
+        <h2 id="titulo-grupo">Resumen del grupo</h2>
+        <div class="mitades">
+          <div class="tarjeta"><div class="etiqueta">Rostros ahora</div><div class="valor" id="rostros-ahora">—</div></div>
+          <div class="tarjeta" id="tarjeta-predominante"><div class="etiqueta">Predominante</div><div class="valor" id="predominante">—</div></div>
+        </div>
+        <div class="etiqueta">Distribución en la última lectura</div>
+        <div class="barras" id="barras-grupo"></div>
+        <div class="etiqueta">Últimas lecturas</div>
+        <ul class="lecturas" id="lecturas"><li>Sin lecturas todavía</li></ul>
+      </section>
     </div>
-    <div class="kpis">
-      <div class="tarjeta"><div class="etiqueta">Expresiones registradas</div><div class="valor" id="kpi-total">—</div></div>
-      <div class="tarjeta"><div class="etiqueta">Lecturas</div><div class="valor" id="kpi-lecturas">—</div></div>
-      <div class="tarjeta"><div class="etiqueta">Más frecuente</div><div class="valor" id="kpi-frecuente">—</div></div>
-      <div class="tarjeta"><div class="etiqueta">Confianza promedio</div><div class="valor" id="kpi-promedio">—</div></div>
-    </div>
-    <div id="grafico" style="display: grid; gap: 8px"></div>
-  </section>
+  </div>
 
-  <section class="ancho" aria-labelledby="titulo-historial">
-    <div class="fila" style="justify-content: space-between">
-      <h2 id="titulo-historial">Últimos análisis</h2>
-      <button type="button" class="boton secundario" id="actualizar">Actualizar</button>
+  <!-- ===================== Analizar imagen ===================== -->
+  <div class="pestana" role="tabpanel" id="panel-imagen" aria-labelledby="tab-imagen" hidden>
+    <div class="mitades">
+      <section aria-labelledby="titulo-analizar">
+        <h2 id="titulo-analizar">Imagen</h2>
+        <div class="vista" id="vista">Selecciona una fotografía del rostro<br>(jpg o png, máximo 5 MB)</div>
+        <div class="fila">
+          <input type="file" id="archivo" accept=".jpg,.jpeg,.png">
+          <label for="archivo" class="boton secundario">Seleccionar imagen</label>
+          <button type="button" id="analizar" disabled>Analizar</button>
+        </div>
+        <p class="mensaje" id="mensaje-analisis" role="status" aria-live="polite"></p>
+      </section>
+      <section aria-labelledby="titulo-resultado">
+        <h2 id="titulo-resultado">Resultado</h2>
+        <div class="tarjeta" id="tarjeta-resultado">
+          <div class="etiqueta">Expresión principal</div>
+          <div class="valor" id="resultado-emocion">Esperando análisis</div>
+          <div id="resultado-confianza"></div>
+        </div>
+        <div class="etiqueta">Distribución de expresiones</div>
+        <div class="barras" id="distribucion"></div>
+      </section>
     </div>
-    <div class="tabla">
-      <table>
-        <thead><tr><th scope="col">Fecha y hora</th><th scope="col">Sesión</th><th scope="col">Fuente</th><th scope="col">Emoción</th><th scope="col">Confianza</th></tr></thead>
-        <tbody id="historial"><tr><td colspan="5">Cargando…</td></tr></tbody>
-      </table>
-    </div>
-  </section>
+  </div>
+
+  <!-- ===================== Estadísticas ===================== -->
+  <div class="pestana" role="tabpanel" id="panel-estadisticas" aria-labelledby="tab-estadisticas" hidden>
+    <section aria-labelledby="titulo-estadisticas">
+      <div class="fila entre">
+        <h2 id="titulo-estadisticas">Estadísticas</h2>
+        <label class="campo">Sesión <select class="ancho filtro-sesion" id="sesion-estadisticas"></select></label>
+      </div>
+      <div class="kpis">
+        <div class="tarjeta"><div class="etiqueta">Expresiones registradas</div><div class="valor" id="kpi-total">—</div></div>
+        <div class="tarjeta"><div class="etiqueta">Lecturas</div><div class="valor" id="kpi-lecturas">—</div></div>
+        <div class="tarjeta"><div class="etiqueta">Más frecuente</div><div class="valor" id="kpi-frecuente">—</div></div>
+        <div class="tarjeta"><div class="etiqueta">Confianza promedio</div><div class="valor" id="kpi-promedio">—</div></div>
+      </div>
+      <div class="etiqueta">Expresiones detectadas</div>
+      <div class="barras" id="grafico"></div>
+    </section>
+  </div>
+
+  <!-- ===================== Historial ===================== -->
+  <div class="pestana" role="tabpanel" id="panel-historial" aria-labelledby="tab-historial" hidden>
+    <section aria-labelledby="titulo-historial">
+      <div class="fila entre">
+        <h2 id="titulo-historial">Historial de análisis</h2>
+        <span class="mensaje" id="contador-historial"></span>
+      </div>
+      <div class="fila entre">
+        <div class="fila">
+          <label class="campo">Sesión <select class="ancho filtro-sesion" id="sesion-historial"></select></label>
+          <label class="campo">Emoción <select id="emocion-historial"><option value="">Todas</option></select></label>
+        </div>
+        <div class="fila">
+          <button type="button" class="secundario" id="actualizar">Actualizar</button>
+          <button type="button" id="exportar">Exportar CSV</button>
+        </div>
+      </div>
+      <div class="tabla">
+        <table>
+          <thead><tr><th scope="col">Fecha y hora</th><th scope="col">Sesión</th><th scope="col">Fuente</th><th scope="col">Emoción</th><th scope="col">Confianza</th><th scope="col">Segunda emoción</th></tr></thead>
+          <tbody id="historial"><tr><td colspan="6">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 </main>
 
 <footer>
@@ -128,11 +229,16 @@
   const COLORES = { enfado: "#D64545", asco: "#6E8B2E", miedo: "#7B5EA7", felicidad: "#E0A100",
                     tristeza: "#3B7DD8", sorpresa: "#E07B39", neutral: "#7D8F87" };
   const FUENTES = { camara: "Cámara", imagen: "Imagen", anterior: "Historial anterior" };
+  const ANCHO_CUADRO = 640;
+  const ULTIMAS_LECTURAS = 5;
   const $ = (id) => document.getElementById(id);
   const nombre = (e) => e ? e.charAt(0).toUpperCase() + e.slice(1) : "—";
   const porcentaje = (v) => `${Number(v).toFixed(2)} %`;
   let sesiones = [];
+  let activa = null;
+  let registros = [];
 
+  // ---------- Utilidades ----------
   function crear(etiqueta, texto, clase) {
     const elemento = document.createElement(etiqueta);
     if (texto !== undefined) elemento.textContent = texto;
@@ -152,6 +258,18 @@
     contenedor.append(fila);
   }
 
+  function barrasDistribucion(contenedor, distribucion, ordenar) {
+    contenedor.replaceChildren();
+    const pares = EMOCIONES.map((e) => [e, distribucion[e] || 0]);
+    if (ordenar) pares.sort((a, b) => b[1] - a[1]);
+    pares.forEach(([e, v]) => barra(contenedor, e, v, 100, porcentaje(v)));
+  }
+
+  function tarjetaColor(tarjeta, emocion) {
+    tarjeta.classList.toggle("color", Boolean(emocion));
+    tarjeta.style.background = emocion ? COLORES[emocion] : "";
+  }
+
   async function pedir(url, opciones) {
     const respuesta = await fetch(url, opciones);
     const datos = await respuesta.json().catch(() => ({}));
@@ -159,12 +277,253 @@
     return datos;
   }
 
-  function mostrarMensaje(texto, esError) {
-    const mensaje = $("mensaje-analisis");
-    mensaje.textContent = texto;
-    mensaje.classList.toggle("error", Boolean(esError));
+  function mensaje(id, texto, esError) {
+    $(id).textContent = texto;
+    $(id).classList.toggle("error", Boolean(esError));
   }
 
+  const hora = () => new Date().toLocaleTimeString("es-PE");
+  const textoSesion = (s) => `${s.grado_seccion} · ${s.curso}`;
+  const etiquetaSesion = (s) => `#${s.id} · ${textoSesion(s)}${s.activa ? " (en curso)" : ""}`;
+
+  // ---------- Pestañas ----------
+  const pestanas = [...document.querySelectorAll('[role="tab"]')];
+  function mostrarPestana(boton) {
+    pestanas.forEach((b) => {
+      const elegida = b === boton;
+      b.setAttribute("aria-selected", String(elegida));
+      $(b.getAttribute("aria-controls")).hidden = !elegida;
+    });
+    if (boton.id === "tab-estadisticas") recargar(cargarEstadisticas);
+    if (boton.id === "tab-historial") recargar(cargarHistorial);
+    if (boton.id === "tab-vivo") dibujarRecuadros();
+  }
+  pestanas.forEach((b) => b.addEventListener("click", () => mostrarPestana(b)));
+
+  // ---------- Sesiones ----------
+  async function cargarSesiones() {
+    sesiones = await pedir("/sesiones");
+    activa = sesiones.find((s) => s.activa) || null;
+    document.querySelectorAll(".filtro-sesion").forEach((select) => {
+      const elegida = select.value;
+      const opciones = [new Option("Todas las sesiones", "")];
+      sesiones.forEach((s) => opciones.push(new Option(etiquetaSesion(s), s.id)));
+      select.replaceChildren(...opciones);
+      select.value = sesiones.some((s) => String(s.id) === elegida) ? elegida : "";
+    });
+    mostrarSesion();
+  }
+
+  function mostrarSesion() {
+    $("form-sesion").hidden = Boolean(activa);
+    $("resumen-sesion").hidden = !activa;
+    $("estado-sesion").textContent = activa ? `Sesión: ${textoSesion(activa)}` : "Sin sesión activa";
+    if (activa) {
+      const desde = new Date(activa.inicio).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+      const docente = activa.docente ? ` · ${activa.docente}` : "";
+      $("texto-sesion").textContent = `● Sesión en curso: ${textoSesion(activa)}${docente} · desde las ${desde}`;
+    }
+    actualizarBotonesCamara();
+  }
+
+  $("form-sesion").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    try {
+      await pedir("/sesiones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ curso: $("curso").value, grado_seccion: $("grado").value, docente: $("docente").value }),
+      });
+      $("form-sesion").reset();
+      lecturas.length = 0;
+      $("lecturas").replaceChildren(crear("li", "Sin lecturas todavía"));
+      await cargarSesiones();
+      mensaje("mensaje-sesion", "Sesión iniciada");
+    } catch (error) {
+      mensaje("mensaje-sesion", error.message, true);
+    }
+  });
+
+  $("cerrar-sesion").addEventListener("click", async () => {
+    if (!activa) return;
+    detenerCamara();
+    try {
+      await pedir(`/sesiones/${activa.id}/cerrar`, { method: "POST" });
+      await cargarSesiones();
+      mensaje("mensaje-sesion", "Sesión cerrada");
+    } catch (error) {
+      mensaje("mensaje-sesion", error.message, true);
+    }
+  });
+
+  // ---------- Cámara del navegador ----------
+  let flujo = null;
+  let temporizador = null;
+  let analizando = false;
+  let ultimoResultado = null;
+  const lecturas = [];
+  const video = $("video");
+  const lienzo = $("recuadros");
+
+  function actualizarBotonesCamara() {
+    const encendida = Boolean(flujo);
+    $("iniciar-camara").disabled = encendida || !activa;
+    $("detener-camara").disabled = !encendida;
+    $("capturar").disabled = !encendida;
+    $("camara").disabled = encendida;
+    if (!encendida) {
+      $("aviso-camara").textContent = activa
+        ? "La cámara está detenida. Presiona «Iniciar cámara» para empezar."
+        : "Inicia una sesión de clase para usar la cámara.";
+    }
+  }
+
+  async function listarCamaras() {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const dispositivos = await navigator.mediaDevices.enumerateDevices();
+    const camaras = dispositivos.filter((d) => d.kind === "videoinput");
+    const elegida = $("camara").value;
+    const opciones = [new Option("Cámara predeterminada", "")];
+    camaras.forEach((c, i) => opciones.push(new Option(c.label || `Cámara ${i + 1}`, c.deviceId)));
+    $("camara").replaceChildren(...opciones);
+    $("camara").value = camaras.some((c) => c.deviceId === elegida) ? elegida : "";
+  }
+
+  async function iniciarCamara() {
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      mensaje("mensaje-camara", "El navegador solo permite la cámara en http://localhost o con https.", true);
+      return;
+    }
+    const id = $("camara").value;
+    try {
+      flujo = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : true, audio: false });
+    } catch (error) {
+      mensaje("mensaje-camara", `No se pudo abrir la cámara (${error.name}). Revisa el permiso del navegador y que otra aplicación no la esté usando.`, true);
+      return;
+    }
+    video.srcObject = flujo;
+    video.hidden = false;
+    $("aviso-camara").textContent = "";
+    $("estado-camara").textContent = "En vivo";
+    $("estado-camara").classList.add("vivo");
+    ultimoResultado = null;
+    dibujarRecuadros();
+    actualizarBotonesCamara();
+    listarCamaras().catch(() => {});
+    mensaje("mensaje-camara", `Cámara activa: se analiza cada ${$("intervalo").value} s en el contenedor`);
+    await video.play().catch(() => {});
+    programarAnalisis(true);
+  }
+
+  function detenerCamara() {
+    clearTimeout(temporizador);
+    temporizador = null;
+    if (flujo) flujo.getTracks().forEach((pista) => pista.stop());
+    flujo = null;
+    video.srcObject = null;
+    video.hidden = true;
+    ultimoResultado = null;
+    dibujarRecuadros();
+    $("estado-camara").textContent = "Detenida";
+    $("estado-camara").classList.remove("vivo");
+    actualizarBotonesCamara();
+  }
+
+  function programarAnalisis(ahora) {
+    clearTimeout(temporizador);
+    if (!flujo) return;
+    const espera = ahora ? 500 : Number($("intervalo").value) * 1000;
+    temporizador = setTimeout(async () => {
+      await analizarCuadro();
+      programarAnalisis(false);
+    }, espera);
+  }
+
+  function cuadroActual() {
+    const escala = Math.min(1, ANCHO_CUADRO / video.videoWidth);
+    const lienzoCuadro = document.createElement("canvas");
+    lienzoCuadro.width = Math.round(video.videoWidth * escala);
+    lienzoCuadro.height = Math.round(video.videoHeight * escala);
+    lienzoCuadro.getContext("2d").drawImage(video, 0, 0, lienzoCuadro.width, lienzoCuadro.height);
+    return new Promise((resolver) => lienzoCuadro.toBlob(resolver, "image/jpeg", 0.85));
+  }
+
+  async function analizarCuadro() {
+    if (!flujo || analizando || !video.videoWidth) return;
+    analizando = true;
+    try {
+      const formulario = new FormData();
+      formulario.append("imagen", await cuadroActual(), "cuadro.jpg");
+      const resultado = await pedir("/analizar-cuadro", { method: "POST", body: formulario });
+      ultimoResultado = resultado;
+      dibujarRecuadros();
+      mostrarGrupo(resultado);
+      mensaje("mensaje-camara", `Última lectura: ${hora()}`);
+    } catch (error) {
+      mensaje("mensaje-camara", error.message, true);
+    } finally {
+      analizando = false;
+    }
+  }
+
+  function dibujarRecuadros() {
+    const ancho = lienzo.clientWidth;
+    const alto = lienzo.clientHeight;
+    lienzo.width = ancho;
+    lienzo.height = alto;
+    const ctx = lienzo.getContext("2d");
+    ctx.clearRect(0, 0, ancho, alto);
+    if (!ultimoResultado || !flujo) return;
+    // El video se muestra con object-fit: contain; se calcula dónde quedó dentro del lienzo
+    const escala = Math.min(ancho / ultimoResultado.ancho, alto / ultimoResultado.alto);
+    const dx = (ancho - ultimoResultado.ancho * escala) / 2;
+    const dy = (alto - ultimoResultado.alto * escala) / 2;
+    ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+    ctx.lineWidth = 3;
+    ultimoResultado.rostros.forEach((r) => {
+      const [x, y, w, h] = r.caja;
+      const color = COLORES[r.emocion] || "#1E7F5E";
+      const bx = dx + x * escala, by = dy + y * escala;
+      ctx.strokeStyle = color;
+      ctx.strokeRect(bx, by, w * escala, h * escala);
+      const texto = `${nombre(r.emocion)} ${Math.round(r.confianza)}%`;
+      const anchoTexto = ctx.measureText(texto).width + 12;
+      const ty = Math.max(0, by - 24);
+      ctx.fillStyle = color;
+      ctx.fillRect(bx - 1.5, ty, anchoTexto, 22);
+      ctx.fillStyle = "#141414";
+      ctx.fillText(texto, bx + 4.5, ty + 16);
+    });
+  }
+
+  function mostrarGrupo(resultado) {
+    $("rostros-ahora").textContent = resultado.total_rostros;
+    $("predominante").textContent = nombre(resultado.predominante);
+    tarjetaColor($("tarjeta-predominante"), resultado.predominante);
+    barrasDistribucion($("barras-grupo"), resultado.distribucion, false);
+    const plural = resultado.total_rostros === 1 ? "rostro" : "rostros";
+    lecturas.unshift(resultado.total_rostros
+      ? `${hora()} · ${nombre(resultado.predominante)} · ${resultado.total_rostros} ${plural}`
+      : `${hora()} · sin rostros`);
+    lecturas.splice(ULTIMAS_LECTURAS);
+    $("lecturas").replaceChildren(...lecturas.map((t) => crear("li", t)));
+  }
+
+  $("iniciar-camara").addEventListener("click", iniciarCamara);
+  $("detener-camara").addEventListener("click", () => {
+    detenerCamara();
+    mensaje("mensaje-camara", "Cámara detenida");
+  });
+  $("capturar").addEventListener("click", () => programarAnalisis(true));
+  $("intervalo").addEventListener("change", () => {
+    if (flujo) {
+      programarAnalisis(false);
+      mensaje("mensaje-camara", `Ahora se analiza cada ${$("intervalo").value} s`);
+    }
+  });
+  window.addEventListener("resize", dibujarRecuadros);
+
+  // ---------- Analizar imagen ----------
   $("archivo").addEventListener("change", () => {
     const archivo = $("archivo").files[0];
     $("analizar").disabled = !archivo;
@@ -173,56 +532,33 @@
     imagen.alt = "Fotografía seleccionada";
     imagen.src = URL.createObjectURL(archivo);
     $("vista").replaceChildren(imagen);
-    mostrarMensaje(archivo.name);
+    mensaje("mensaje-analisis", archivo.name);
   });
 
   $("analizar").addEventListener("click", async () => {
     const formulario = new FormData();
     formulario.append("imagen", $("archivo").files[0]);
     $("analizar").disabled = true;
-    mostrarMensaje("Analizando…");
+    mensaje("mensaje-analisis", "Analizando…");
     try {
       const resultado = await pedir("/predecir", { method: "POST", body: formulario });
-      mostrarResultado(resultado);
-      mostrarMensaje("Análisis completado y guardado en el historial");
-      actualizarTodo();
+      tarjetaColor($("tarjeta-resultado"), resultado.emocion);
+      $("resultado-emocion").textContent = nombre(resultado.emocion);
+      $("resultado-confianza").textContent = `Confianza: ${porcentaje(resultado.confianza)}`;
+      barrasDistribucion($("distribucion"), resultado.todas, true);
+      mensaje("mensaje-analisis", activa ? "Análisis guardado en la sesión en curso" : "Análisis guardado en el historial");
     } catch (error) {
-      mostrarMensaje(error.message, true);
+      mensaje("mensaje-analisis", error.message, true);
     } finally {
       $("analizar").disabled = false;
     }
   });
 
-  function mostrarResultado(resultado) {
-    const tarjeta = $("tarjeta-resultado");
-    tarjeta.classList.add("resultado");
-    tarjeta.style.background = COLORES[resultado.emocion] || "#1E7F5E";
-    $("resultado-emocion").textContent = nombre(resultado.emocion);
-    $("resultado-confianza").textContent = `Confianza: ${porcentaje(resultado.confianza)}`;
-    const distribucion = $("distribucion");
-    distribucion.replaceChildren();
-    Object.entries(resultado.todas).sort((a, b) => b[1] - a[1])
-      .forEach(([emocion, valor]) => barra(distribucion, emocion, valor, 100, porcentaje(valor)));
-  }
-
-  function consultaSesion(prefijo) {
-    const id = $("sesion").value;
-    return id ? `${prefijo}sesion_id=${id}` : "";
-  }
-
-  async function cargarSesiones() {
-    sesiones = await pedir("/sesiones");
-    const elegida = $("sesion").value;
-    const opciones = [new Option("Todas las sesiones", "")];
-    sesiones.forEach((s) => opciones.push(new Option(`#${s.id} · ${s.grado_seccion} · ${s.curso}${s.activa ? " (en curso)" : ""}`, s.id)));
-    $("sesion").replaceChildren(...opciones);
-    $("sesion").value = sesiones.some((s) => String(s.id) === elegida) ? elegida : "";
-    const activa = sesiones.find((s) => s.activa);
-    $("estado-sesion").textContent = activa ? `Sesión: ${activa.grado_seccion} · ${activa.curso}` : "Sin sesión activa";
-  }
+  // ---------- Estadísticas ----------
+  const consultaSesion = (select, prefijo) => (select.value ? `${prefijo}sesion_id=${select.value}` : "");
 
   async function cargarEstadisticas() {
-    const datos = await pedir(`/estadisticas${consultaSesion("?")}`);
+    const datos = await pedir(`/estadisticas${consultaSesion($("sesion-estadisticas"), "?")}`);
     $("kpi-total").textContent = datos.total;
     $("kpi-lecturas").textContent = datos.lecturas;
     const frecuente = datos.total ? EMOCIONES.reduce((a, b) => (datos.por_emocion[b] > datos.por_emocion[a] ? b : a)) : null;
@@ -234,46 +570,80 @@
     EMOCIONES.forEach((e) => barra(grafico, e, datos.por_emocion[e], maximo, String(datos.por_emocion[e])));
   }
 
+  // ---------- Historial ----------
+  EMOCIONES.forEach((e) => $("emocion-historial").append(new Option(nombre(e), e)));
+
+  function segundaEmocion(todas) {
+    const [, segunda] = Object.entries(todas).sort((a, b) => b[1] - a[1]);
+    return segunda ? `${nombre(segunda[0])} (${porcentaje(segunda[1])})` : "—";
+  }
+
+  const visibles = () => registros.filter((r) => !$("emocion-historial").value || r.emocion === $("emocion-historial").value);
+
   async function cargarHistorial() {
-    const registros = await pedir(`/historial?limite=20${consultaSesion("&")}`);
+    registros = await pedir(`/historial?limite=100${consultaSesion($("sesion-historial"), "&")}`);
+    mostrarHistorial();
+  }
+
+  function mostrarHistorial() {
     const cuerpo = $("historial");
-    cuerpo.replaceChildren();
-    if (!registros.length) {
+    const filas = visibles();
+    $("contador-historial").textContent = `Mostrando ${filas.length} de los últimos ${registros.length} análisis`;
+    if (!filas.length) {
       const fila = crear("tr");
       const celda = crear("td", "Aún no hay análisis registrados");
-      celda.colSpan = 5;
+      celda.colSpan = 6;
       fila.append(celda);
-      cuerpo.append(fila);
+      cuerpo.replaceChildren(fila);
       return;
     }
-    const nombresSesion = Object.fromEntries(sesiones.map((s) => [s.id, `#${s.id} · ${s.grado_seccion}`]));
-    registros.forEach((r) => {
+    const nombres = Object.fromEntries(sesiones.map((s) => [s.id, `#${s.id} · ${s.grado_seccion}`]));
+    cuerpo.replaceChildren(...filas.map((r) => {
       const fila = crear("tr");
       fila.append(
         crear("td", new Date(r.fecha).toLocaleString("es-PE")),
-        crear("td", nombresSesion[r.sesion_id] || "—"),
+        crear("td", nombres[r.sesion_id] || "—"),
         crear("td", FUENTES[r.fuente] || r.fuente),
         crear("td", nombre(r.emocion)),
         crear("td", porcentaje(r.confianza)),
+        crear("td", segundaEmocion(r.todas)),
       );
-      cuerpo.append(fila);
-    });
+      return fila;
+    }));
   }
 
-  async function actualizarTodo() {
+  function exportarCsv() {
+    const celda = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+    const encabezado = ["id", "fecha", "emocion", "confianza", ...EMOCIONES, "sesion_id", "fuente"];
+    const lineas = visibles().map((r) => [r.id, r.fecha, r.emocion, r.confianza, ...EMOCIONES.map((e) => r.todas[e] ?? 0), r.sesion_id, r.fuente]);
+    const texto = [encabezado, ...lineas].map((l) => l.map(celda).join(",")).join("\r\n");
+    const enlace = document.createElement("a");
+    enlace.href = URL.createObjectURL(new Blob(["﻿" + texto], { type: "text/csv;charset=utf-8" }));
+    enlace.download = "historial_emoticontigo.csv";
+    enlace.click();
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+  }
+
+  $("emocion-historial").addEventListener("change", mostrarHistorial);
+  $("sesion-historial").addEventListener("change", () => cargarHistorial().catch(() => {}));
+  $("sesion-estadisticas").addEventListener("change", () => cargarEstadisticas().catch(() => {}));
+  $("actualizar").addEventListener("click", () => recargar(cargarHistorial));
+  $("exportar").addEventListener("click", exportarCsv);
+
+  // ---------- Inicio ----------
+  async function recargar(siguiente) {
     try {
       await pedir("/salud");
       $("estado-servidor").textContent = "● API conectada";
       await cargarSesiones();
-      await Promise.all([cargarEstadisticas(), cargarHistorial()]);
+      if (siguiente) await siguiente();
     } catch (error) {
       $("estado-servidor").textContent = "API no disponible";
     }
   }
 
-  $("sesion").addEventListener("change", () => Promise.all([cargarEstadisticas(), cargarHistorial()]));
-  $("actualizar").addEventListener("click", actualizarTodo);
-  actualizarTodo();
+  barrasDistribucion($("barras-grupo"), {}, false);
+  recargar(listarCamaras);
 </script>
 </body>
 </html>

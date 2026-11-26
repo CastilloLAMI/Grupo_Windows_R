@@ -6,7 +6,8 @@ from unittest import mock
 
 from PIL import Image
 
-from src.app import crear_app
+from src.app import a_bgr, crear_app
+from src.camara import DetectorRostros
 from src.historial import cerrar_sesion, iniciar_sesion
 from src.preprocess import EMOCIONES
 
@@ -47,6 +48,8 @@ class TestApi(unittest.TestCase):
         self.assertIn("/historial", rutas)
         self.assertIn("/sesiones", rutas)
         self.assertIn("/", rutas)
+        self.assertIn("/analizar-cuadro", rutas)
+        self.assertIn("/sesiones/<int:sesion_id>/cerrar", rutas)
 
     def test_predecir_ok(self):
         respuesta = self.cliente.post("/predecir", data=imagen_png())
@@ -177,6 +180,97 @@ class TestApi(unittest.TestCase):
         self.assertIn("EMOTICONTIGO", html)
         for ruta in ("/predecir", "/estadisticas", "/historial", "/sesiones"):
             self.assertIn(ruta, html)
+
+
+class CascadaFalsa:
+    """Imita el clasificador Haar de OpenCV: devuelve siempre los mismos recuadros."""
+
+    def __init__(self, rostros):
+        self.rostros = rostros
+
+    def detectMultiScale(self, gris, **argumentos):
+        return self.rostros
+
+
+def cuadro_jpg(ancho=320, alto=240):
+    buffer = io.BytesIO()
+    Image.new("RGB", (ancho, alto), (200, 170, 150)).save(buffer, format="JPEG")
+    buffer.seek(0)
+    return {"imagen": (buffer, "cuadro.jpg")}
+
+
+class TestSesionesYCamaraWeb(unittest.TestCase):
+    """La cámara del navegador y las sesiones de clase, para usar todo desde el contenedor."""
+
+    def setUp(self):
+        self.carpeta = tempfile.TemporaryDirectory()
+        self.ruta_bd = os.path.join(self.carpeta.name, "web.db")
+        rostros = DetectorRostros(CascadaFalsa([(10, 20, 60, 60), (150, 40, 60, 60)]))
+        self.cliente = crear_app(
+            detector=DetectorFalso(), ruta_bd=self.ruta_bd, detector_rostros=rostros,
+        ).test_client()
+
+    def tearDown(self):
+        self.carpeta.cleanup()
+
+    def abrir(self, **datos):
+        cuerpo = {"curso": "Matemática", "grado_seccion": "5.º A", **datos}
+        return self.cliente.post("/sesiones", json=cuerpo)
+
+    def test_abrir_sesion(self):
+        respuesta = self.abrir(docente="Prof. Ana")
+        self.assertEqual(respuesta.status_code, 201)
+        sesion = respuesta.get_json()
+        self.assertTrue(sesion["activa"])
+        self.assertEqual(sesion["curso"], "Matemática")
+        self.assertEqual(sesion["docente"], "Prof. Ana")
+
+    def test_abrir_sesion_con_datos_incompletos(self):
+        self.assertEqual(self.abrir(curso="  ").status_code, 400)
+        respuesta = self.cliente.post("/sesiones", data="no es json")
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("JSON", respuesta.get_json()["error"])
+
+    def test_cerrar_sesion(self):
+        sesion_id = self.abrir().get_json()["id"]
+        respuesta = self.cliente.post(f"/sesiones/{sesion_id}/cerrar")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(respuesta.get_json()["activa"])
+        self.assertEqual(self.cliente.post(f"/sesiones/{sesion_id}/cerrar").status_code, 409)
+        self.assertEqual(self.cliente.post("/sesiones/999/cerrar").status_code, 404)
+
+    def test_analizar_cuadro_sin_sesion(self):
+        respuesta = self.cliente.post("/analizar-cuadro", data=cuadro_jpg())
+        self.assertEqual(respuesta.status_code, 409)
+        self.assertIn("sesión", respuesta.get_json()["error"])
+
+    def test_analizar_cuadro_con_varios_rostros(self):
+        sesion_id = self.abrir().get_json()["id"]
+        respuesta = self.cliente.post("/analizar-cuadro", data=cuadro_jpg())
+        self.assertEqual(respuesta.status_code, 200)
+        datos = respuesta.get_json()
+        self.assertEqual(datos["total_rostros"], 2)
+        self.assertEqual(datos["rostros"][0]["caja"], [10, 20, 60, 60])
+        self.assertEqual(datos["predominante"], "felicidad")
+        self.assertEqual((datos["ancho"], datos["alto"]), (320, 240))
+        self.assertEqual(datos["sesion_id"], sesion_id)
+
+        historial = self.cliente.get(f"/historial?sesion_id={sesion_id}").get_json()
+        self.assertEqual(len(historial), 2)
+        self.assertTrue(all(registro["fuente"] == "camara" for registro in historial))
+        self.assertEqual(self.cliente.get(f"/estadisticas?sesion_id={sesion_id}").get_json()["lecturas"], 1)
+
+    def test_analizar_cuadro_valida_la_imagen(self):
+        self.abrir()
+        self.assertEqual(self.cliente.post("/analizar-cuadro").status_code, 400)
+        malo = {"imagen": (io.BytesIO(b"no soy una imagen"), "cuadro.jpg")}
+        respuesta = self.cliente.post("/analizar-cuadro", data=malo)
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_a_bgr_invierte_los_canales(self):
+        bgr = a_bgr(Image.new("RGB", (2, 2), (255, 0, 0)))
+        self.assertEqual(bgr.shape, (2, 2, 3))
+        self.assertEqual(tuple(int(v) for v in bgr[0, 0]), (0, 0, 255))
 
 
 class TestPrecarga(unittest.TestCase):

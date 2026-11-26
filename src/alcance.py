@@ -35,6 +35,7 @@ ENDPOINTS_PERMITIDOS = (
     "/estadisticas",
     "/historial",
     "/sesiones",
+    "/analizar-cuadro",
 )
 
 # ============================================================

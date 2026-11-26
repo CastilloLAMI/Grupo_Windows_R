@@ -92,7 +92,9 @@ class TestArchivosDeApoyo(unittest.TestCase):
         for paquete in ("flask", "gunicorn", "transformers", "pillow", "numpy"):
             self.assertIn(paquete, texto)
         self.assertNotIn("customtkinter", texto)
-        self.assertNotIn("opencv", texto)
+        # OpenCV sin interfaz gráfica: el contenedor no tiene pantalla
+        self.assertIn("opencv-python-headless", texto)
+        self.assertNotIn("opencv-python>", texto)
 
 
 if __name__ == "__main__":
