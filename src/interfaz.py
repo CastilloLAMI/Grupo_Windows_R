@@ -18,8 +18,9 @@ try:
         dibujar_resultados, guardar_resultado_cuadro,
     )
     from src.historial import (
-        LIMITE_MAXIMO, RUTA_POR_DEFECTO, exportar_csv, guardar_analisis, inicializar_bd,
-        listar_historial, obtener_estadisticas,
+        LIMITE_MAXIMO, RUTA_POR_DEFECTO, cerrar_sesion, exportar_csv, guardar_analisis, iniciar_sesion,
+        inicializar_bd, listar_historial, listar_sesiones, obtener_estadisticas, obtener_sesion,
+        sesion_activa,
     )
     from src.model import DetectorEmociones
     from src.preprocess import EMOCIONES, EXTENSIONES_VALIDAS
@@ -29,8 +30,9 @@ except ImportError:  # Permite ejecutar `python src/interfaz.py`
         dibujar_resultados, guardar_resultado_cuadro,
     )
     from historial import (
-        LIMITE_MAXIMO, RUTA_POR_DEFECTO, exportar_csv, guardar_analisis, inicializar_bd,
-        listar_historial, obtener_estadisticas,
+        LIMITE_MAXIMO, RUTA_POR_DEFECTO, cerrar_sesion, exportar_csv, guardar_analisis, iniciar_sesion,
+        inicializar_bd, listar_historial, listar_sesiones, obtener_estadisticas, obtener_sesion,
+        sesion_activa,
     )
     from model import DetectorEmociones
     from preprocess import EMOCIONES, EXTENSIONES_VALIDAS
@@ -49,8 +51,9 @@ RETARDO_CARGA_MS = 100
 PORCENTAJE_MAXIMO = 100
 ULTIMOS_ANALISIS = 6
 FORMATO_FECHA = "%d/%m/%Y  %H:%M"
-FORMATO_FECHA_SESION = "%d/%m/%Y"
 FORMATO_HORA = "%H:%M:%S"
+FORMATO_HORA_CORTA = "%H:%M"
+FORMATO_DIA = "%d/%m"
 
 PESTANA_VIVO = "Clase en vivo"
 PESTANA_ANALISIS = "Analizar imagen"
@@ -68,11 +71,23 @@ TAMANO_MINIMO_VISTA = 2
 # Historial
 TODAS = "Todas"
 COLUMNAS_HISTORIAL = (
-    ("fecha", "Fecha y hora", 180),
-    ("emocion", "Emoción", 160),
-    ("confianza", "Confianza", 120),
-    ("segunda", "Segunda emoción", 200),
+    ("fecha", "Fecha y hora", 150),
+    ("sesion", "Sesión", 170),
+    ("fuente", "Fuente", 120),
+    ("emocion", "Emoción", 120),
+    ("confianza", "Confianza", 100),
+    ("segunda", "Segunda emoción", 180),
 )
+
+# Sesiones de clase
+SIN_SESION = "Sin sesión activa"
+TODAS_LAS_SESIONES = "Todas las sesiones"
+NOMBRES_FUENTE = {"camara": "Cámara", "imagen": "Imagen", "anterior": "Historial anterior"}
+ANCHO_ENTRADA = 210
+ANCHO_ENTRADA_CHICA = 150
+ANCHO_COMBO_SESION = 300
+TEXTO_SIN_SESION_VIDEO = "Inicia una sesión de clase (arriba) para usar la cámara."
+TEXTO_CAMARA_DETENIDA = "La cámara está detenida.\nPresiona «Iniciar cámara» para empezar."
 ALTO_FILA_TABLA = 30
 ARCHIVO_CSV_DEFECTO = "historial_emoticontigo.csv"
 
@@ -248,6 +263,31 @@ def texto_lectura(resultado, hora):
     return f"{hora}  ·  {nombre_visible(resultado['predominante'])}  ·  {rostros} {plural}"
 
 
+def texto_sesion(sesion):
+    """'5.º A · Matemática', o el aviso de que no hay sesión."""
+    if not sesion:
+        return SIN_SESION
+    return f"{sesion['grado_seccion']} · {sesion['curso']}"
+
+
+def etiqueta_sesion(sesion):
+    """Texto de una sesión para los filtros: '#3 · 5.º A · Matemática · 21/11'."""
+    dia = datetime.fromisoformat(sesion["inicio"]).astimezone().strftime(FORMATO_DIA)
+    return f"#{sesion['id']} · {texto_sesion(sesion)} · {dia}"
+
+
+def opciones_sesiones(sesiones):
+    """Textos para el filtro y un diccionario texto -> id (None = todas)."""
+    mapa = {TODAS_LAS_SESIONES: None}
+    for sesion in sesiones:
+        mapa[etiqueta_sesion(sesion)] = sesion["id"]
+    return list(mapa), mapa
+
+
+def nombre_fuente(fuente):
+    return NOMBRES_FUENTE.get(fuente, fuente or SIN_DATO)
+
+
 class AplicacionEmociones(ctk.CTk):
     """Ventana principal: cámara en vivo, análisis de fotos, estadísticas e historial."""
 
@@ -262,7 +302,11 @@ class AplicacionEmociones(ctk.CTk):
         self.ultimo_numero = 0
         self.lecturas = []
         self.registros = []
+        self.sesion = sesion_activa(self.ruta_bd)
+        self.mapa_sesiones = {TODAS_LAS_SESIONES: None}
+        self.nombres_sesion = {}
         self._construir_interfaz()
+        self._mostrar_sesion()
         self._actualizar_estadisticas()
         self.protocol("WM_DELETE_WINDOW", self._cerrar)
         self.after(RETARDO_CARGA_MS, self._iniciar_carga_modelo)
@@ -332,7 +376,7 @@ class AplicacionEmociones(ctk.CTk):
 
         pildoras = ctk.CTkFrame(encabezado, fg_color=COLOR_TRANSPARENTE)
         pildoras.pack(side="right", padx=MARGEN * 2)
-        self._crear_pildora(pildoras, f"Sesión: {datetime.now().strftime(FORMATO_FECHA_SESION)}")
+        self.pildora_sesion = self._crear_pildora(pildoras, SIN_SESION)
         self.pildora_modelo = self._crear_pildora(pildoras, "Cargando modelo...")
 
     def _crear_pildora(self, contenedor, texto):
@@ -389,13 +433,13 @@ class AplicacionEmociones(ctk.CTk):
             corner_radius=RADIO_BOTON, font=FUENTE_BOTON, **colores, **opciones,
         )
 
-    def _crear_combo(self, contenedor, etiqueta, valores, comando=None):
+    def _crear_combo(self, contenedor, etiqueta, valores, comando=None, ancho=ANCHO_COMBO):
         caja = ctk.CTkFrame(contenedor, fg_color=COLOR_TRANSPARENTE)
         ctk.CTkLabel(
             caja, text=etiqueta, font=FUENTE_ETIQUETA, text_color=COLOR_TEXTO_SUAVE, anchor="w",
         ).pack(anchor="w")
         combo = ctk.CTkComboBox(
-            caja, values=list(valores), width=ANCHO_COMBO, state="readonly", font=FUENTE_NORMAL,
+            caja, values=list(valores), width=ancho, state="readonly", font=FUENTE_NORMAL,
             dropdown_font=FUENTE_NORMAL, border_color=COLOR_BORDE, button_color=COLOR_BOTON,
             button_hover_color=COLOR_BOTON_HOVER, command=comando,
         )
@@ -408,15 +452,51 @@ class AplicacionEmociones(ctk.CTk):
     def _crear_pestana_vivo(self, pestana):
         pestana.grid_columnconfigure(0, weight=3, uniform="vivo")
         pestana.grid_columnconfigure(1, weight=2, uniform="vivo")
-        pestana.grid_rowconfigure(0, weight=1)
+        pestana.grid_rowconfigure(1, weight=1)
 
+        self._crear_barra_sesion(pestana)
         izquierda = self._crear_panel(pestana)
-        izquierda.grid(row=0, column=0, sticky="nsew", padx=(0, SEPARACION))
+        izquierda.grid(row=1, column=0, sticky="nsew", padx=(0, SEPARACION))
         derecha = self._crear_panel(pestana)
-        derecha.grid(row=0, column=1, sticky="nsew", padx=(SEPARACION, 0))
+        derecha.grid(row=1, column=1, sticky="nsew", padx=(SEPARACION, 0))
 
         self._crear_panel_camara(izquierda)
         self._crear_panel_grupo(derecha)
+
+    def _crear_barra_sesion(self, pestana):
+        barra = self._crear_panel(pestana)
+        barra.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, SEPARACION * 2))
+
+        self.formulario_sesion = ctk.CTkFrame(barra, fg_color=COLOR_TRANSPARENTE)
+        ctk.CTkLabel(
+            self.formulario_sesion, text="Nueva sesión de clase", font=FUENTE_EMOCION, text_color=COLOR_TEXTO,
+        ).pack(side="left", padx=(0, SEPARACION))
+        self.entrada_curso = self._crear_entrada(self.formulario_sesion, "Curso (ej. Matemática)")
+        self.entrada_grado = self._crear_entrada(self.formulario_sesion, "Grado y sección (ej. 5.º A)")
+        self.entrada_docente = self._crear_entrada(
+            self.formulario_sesion, "Docente (opcional)", ANCHO_ENTRADA_CHICA,
+        )
+        self._crear_boton(self.formulario_sesion, "Iniciar sesión", self._iniciar_sesion).pack(side="right")
+
+        self.resumen_sesion = ctk.CTkFrame(barra, fg_color=COLOR_TRANSPARENTE)
+        ctk.CTkLabel(
+            self.resumen_sesion, text="●", font=FUENTE_EMOCION, text_color=COLOR_EXITO,
+        ).pack(side="left", padx=(0, SEPARACION_CHICA))
+        self.texto_sesion_activa = ctk.CTkLabel(
+            self.resumen_sesion, text="", font=FUENTE_EMOCION, text_color=COLOR_TEXTO, anchor="w",
+        )
+        self.texto_sesion_activa.pack(side="left")
+        self._crear_boton(
+            self.resumen_sesion, "Cerrar sesión", self._cerrar_sesion, principal=False,
+        ).pack(side="right")
+
+    def _crear_entrada(self, contenedor, texto, ancho=ANCHO_ENTRADA):
+        entrada = ctk.CTkEntry(
+            contenedor, placeholder_text=texto, width=ancho, height=ALTO_BOTON - SEPARACION_CHICA,
+            font=FUENTE_NORMAL, border_color=COLOR_BORDE, corner_radius=RADIO_BOTON,
+        )
+        entrada.pack(side="left", padx=(0, SEPARACION))
+        return entrada
 
     def _crear_panel_camara(self, panel):
         cabecera = ctk.CTkFrame(panel, fg_color=COLOR_TRANSPARENTE)
@@ -434,9 +514,10 @@ class AplicacionEmociones(ctk.CTk):
         self.marco_video.pack(fill="both", expand=True, padx=MARGEN)
         self.video = tk.Label(
             self.marco_video, bg=COLOR_FONDO_VIDEO, fg=COLOR_TEXTO_VIDEO, font=FUENTE_NORMAL,
-            text="La cámara está detenida.\nPresiona «Iniciar cámara» para empezar.",
+            text=TEXTO_CAMARA_DETENIDA,
         )
         self.video.place(relx=0.5, rely=0.5, anchor="center")
+        self.video.image = None
 
         controles = ctk.CTkFrame(panel, fg_color=COLOR_TRANSPARENTE)
         controles.pack(fill="x", padx=MARGEN, pady=(SEPARACION, 0))
@@ -543,7 +624,9 @@ class AplicacionEmociones(ctk.CTk):
             camara,
             AnalizadorAula(self.detector),
             intervalo=segundos_intervalo(self.combo_intervalo.get()),
-            guardar=lambda resultado: guardar_resultado_cuadro(resultado, self.ruta_bd),
+            guardar=lambda resultado, sesion_id=self.sesion["id"]: guardar_resultado_cuadro(
+                resultado, self.ruta_bd, sesion_id=sesion_id,
+            ),
         )
 
     def _iniciar_camara(self):
@@ -595,16 +678,22 @@ class AplicacionEmociones(ctk.CTk):
         monitor.detener()
         self.after(0, self._camara_detenida)
 
+    def _puede_iniciar_camara(self):
+        return self.modelo_listo and self.sesion is not None and self.monitor is None
+
     def _camara_detenida(self):
-        self._botones_camara(iniciar=self.modelo_listo, detener=False, capturar=False)
+        self._botones_camara(iniciar=self._puede_iniciar_camara(), detener=False, capturar=False)
         self.combo_camara.configure(state="readonly")
         self.estado_camara.configure(text="Detenida", fg_color=COLOR_BOTON_SECUNDARIO, text_color=COLOR_TEXTO_SUAVE)
-        self.video.configure(image="", text="La cámara está detenida.\nPresiona «Iniciar cámara» para empezar.")
+        self.video.configure(image="", text=TEXTO_CAMARA_DETENIDA if self.sesion else TEXTO_SIN_SESION_VIDEO)
         self.video.image = None
         self._mostrar_estado("Cámara detenida", COLOR_TEXTO_SUAVE)
 
     def _botones_camara(self, iniciar, detener, capturar):
-        self.boton_iniciar.configure(state="normal" if iniciar else "disabled")
+        self.boton_iniciar.configure(
+            state="normal" if iniciar else "disabled",
+            fg_color=COLOR_BOTON if iniciar else COLOR_BOTON_SECUNDARIO,
+        )
         self.boton_detener.configure(state="normal" if detener else "disabled")
         self.boton_capturar.configure(state="normal" if capturar else "disabled")
 
@@ -668,6 +757,75 @@ class AplicacionEmociones(ctk.CTk):
         del self.lecturas[ULTIMAS_LECTURAS:]
         self.lista_lecturas.configure(text="\n".join(self.lecturas), text_color=COLOR_TEXTO)
         self._mostrar_estado(f"Última lectura: {hora}", COLOR_EXITO)
+
+    # ---------- Sesión de clase ----------
+
+    def _mostrar_sesion(self):
+        """Muestra el formulario o la sesión en curso, y habilita la cámara según corresponda."""
+        if self.sesion:
+            self.formulario_sesion.pack_forget()
+            docente = f" · {self.sesion['docente']}" if self.sesion["docente"] else ""
+            desde = datetime.fromisoformat(self.sesion["inicio"]).astimezone().strftime(FORMATO_HORA_CORTA)
+            self.texto_sesion_activa.configure(
+                text=f"Sesión en curso: {texto_sesion(self.sesion)}{docente} · desde las {desde}",
+            )
+            self.resumen_sesion.pack(fill="x", padx=MARGEN, pady=SEPARACION)
+        else:
+            self.resumen_sesion.pack_forget()
+            self.formulario_sesion.pack(fill="x", padx=MARGEN, pady=SEPARACION)
+        self.pildora_sesion.configure(text=f"Sesión: {texto_sesion(self.sesion)}" if self.sesion else SIN_SESION)
+        if self.monitor is None:
+            self._botones_camara(iniciar=self._puede_iniciar_camara(), detener=False, capturar=False)
+            if self.video.image is None:
+                self.video.configure(text=TEXTO_CAMARA_DETENIDA if self.sesion else TEXTO_SIN_SESION_VIDEO)
+
+    def _iniciar_sesion(self):
+        try:
+            sesion_id = iniciar_sesion(
+                self.entrada_curso.get(), self.entrada_grado.get(), self.entrada_docente.get(), self.ruta_bd,
+            )
+        except ValueError:
+            messagebox.showwarning("Sesión de clase", "Escribe el curso y el grado y sección para empezar.")
+            return
+        for entrada in (self.entrada_curso, self.entrada_grado, self.entrada_docente):
+            entrada.delete(0, "end")
+        self.sesion = obtener_sesion(sesion_id, self.ruta_bd)
+        self.lecturas = []
+        self.lista_lecturas.configure(text="Sin lecturas todavía", text_color=COLOR_TEXTO_SUAVE)
+        self._mostrar_sesion()
+        self._mostrar_estado(f"Sesión iniciada: {texto_sesion(self.sesion)}", COLOR_EXITO)
+
+    def _cerrar_sesion(self):
+        if self.sesion is None:
+            return
+        if self.monitor is not None:
+            if not messagebox.askyesno("Cerrar sesión", "La cámara está activa. ¿Detenerla y cerrar la sesión?"):
+                return
+            monitor = self.monitor
+            self.monitor = None
+            monitor.detener()
+            self._camara_detenida()
+        cerrar_sesion(self.sesion["id"], self.ruta_bd)
+        nombre = texto_sesion(self.sesion)
+        self.sesion = None
+        self._mostrar_sesion()
+        self._mostrar_estado(f"Sesión cerrada: {nombre}", COLOR_TEXTO_SUAVE)
+
+    def _refrescar_sesiones(self):
+        """Actualiza las opciones de los filtros por sesión, conservando la elegida."""
+        sesiones = listar_sesiones(self.ruta_bd)
+        textos, self.mapa_sesiones = opciones_sesiones(sesiones)
+        self.nombres_sesion = {
+            sesion["id"]: f"#{sesion['id']} · {sesion['grado_seccion']}" for sesion in sesiones
+        }
+        for combo in (self.combo_sesion_estadisticas, self.combo_sesion_historial):
+            elegida = combo.get()
+            combo.configure(values=textos)
+            if elegida not in self.mapa_sesiones:
+                combo.set(TODAS_LAS_SESIONES)
+
+    def _sesion_filtrada(self, combo):
+        return self.mapa_sesiones.get(combo.get())
 
     # ---------- Pestaña: analizar imagen ----------
 
@@ -767,9 +925,10 @@ class AplicacionEmociones(ctk.CTk):
     def _modelo_listo(self):
         self.modelo_listo = True
         self.pildora_modelo.configure(text="●  Modelo listo")
-        self._mostrar_estado("Modelo listo. Inicia la cámara o analiza una fotografía.", COLOR_EXITO)
+        siguiente = "Inicia la cámara" if self.sesion else "Inicia una sesión de clase"
+        self._mostrar_estado(f"Modelo listo. {siguiente} o analiza una fotografía.", COLOR_EXITO)
         if self.monitor is None:
-            self.boton_iniciar.configure(state="normal")
+            self._botones_camara(iniciar=self._puede_iniciar_camara(), detener=False, capturar=False)
         if self.ruta_imagen:
             self.boton_analizar.configure(state="normal")
 
@@ -816,7 +975,7 @@ class AplicacionEmociones(ctk.CTk):
         try:
             imagen = Image.open(ruta).convert("RGB")
             resultado = self.detector.predecir(imagen)
-            guardar_analisis(resultado, self.ruta_bd)
+            guardar_analisis(resultado, self.ruta_bd, sesion_id=self.sesion["id"] if self.sesion else None)
         except Exception as error:  # noqa: BLE001
             mensaje = str(error)
             self.after(0, lambda m=mensaje: self._fallo_analisis(m))
@@ -860,17 +1019,26 @@ class AplicacionEmociones(ctk.CTk):
     def _crear_pestana_estadisticas(self, pestana):
         pestana.grid_columnconfigure(0, weight=3, uniform="estadisticas")
         pestana.grid_columnconfigure(1, weight=2, uniform="estadisticas")
-        pestana.grid_rowconfigure(1, weight=1)
+        pestana.grid_rowconfigure(2, weight=1)
+
+        filtro = ctk.CTkFrame(pestana, fg_color=COLOR_TRANSPARENTE)
+        filtro.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, SEPARACION))
+        caja, self.combo_sesion_estadisticas = self._crear_combo(
+            filtro, "Sesión", [TODAS_LAS_SESIONES], comando=lambda _: self._actualizar_estadisticas(),
+            ancho=ANCHO_COMBO_SESION,
+        )
+        caja.pack(side="left")
 
         tarjetas = ctk.CTkFrame(pestana, fg_color=COLOR_TRANSPARENTE)
-        tarjetas.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, SEPARACION))
-        tarjetas.grid_columnconfigure((0, 1, 2), weight=1, uniform="kpi")
-        self.kpi_total = self._crear_kpi(tarjetas, 0, "ANÁLISIS REGISTRADOS")
-        self.kpi_frecuente = self._crear_kpi(tarjetas, 1, "EXPRESIÓN MÁS FRECUENTE")
-        self.kpi_promedio = self._crear_kpi(tarjetas, 2, "CONFIANZA PROMEDIO")
+        tarjetas.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, SEPARACION))
+        tarjetas.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="kpi")
+        self.kpi_total = self._crear_kpi(tarjetas, 0, "EXPRESIONES REGISTRADAS")
+        self.kpi_lecturas = self._crear_kpi(tarjetas, 1, "LECTURAS")
+        self.kpi_frecuente = self._crear_kpi(tarjetas, 2, "EXPRESIÓN MÁS FRECUENTE")
+        self.kpi_promedio = self._crear_kpi(tarjetas, 3, "CONFIANZA PROMEDIO")
 
         panel_grafico = self._crear_panel(pestana)
-        panel_grafico.grid(row=1, column=0, sticky="nsew", padx=(0, SEPARACION))
+        panel_grafico.grid(row=2, column=0, sticky="nsew", padx=(0, SEPARACION))
         self._titulo_seccion(panel_grafico, "Expresiones detectadas")
         self.figura = Figure(figsize=TAMANO_FIGURA, dpi=DPI_FIGURA, facecolor=COLOR_PANEL)
         self.eje = self.figura.add_subplot(111)
@@ -880,12 +1048,12 @@ class AplicacionEmociones(ctk.CTk):
         panel_grafico.pack_propagate(False)
 
         panel_ultimos = self._crear_panel(pestana)
-        panel_ultimos.grid(row=1, column=1, sticky="nsew", padx=(SEPARACION, 0))
+        panel_ultimos.grid(row=2, column=1, sticky="nsew", padx=(SEPARACION, 0))
         self._titulo_seccion(panel_ultimos, "Últimos análisis")
         self.lista_ultimos = ctk.CTkScrollableFrame(panel_ultimos, fg_color=COLOR_TRANSPARENTE, height=ALTO_TARJETA)
         self.lista_ultimos.pack(fill="both", expand=True, padx=SEPARACION)
         self._crear_boton(
-            panel_ultimos, "Actualizar", self._actualizar_estadisticas, principal=False,
+            panel_ultimos, "Actualizar", self._recargar_estadisticas, principal=False,
         ).pack(fill="x", padx=MARGEN, pady=MARGEN)
 
     def _crear_kpi(self, contenedor, columna, titulo):
@@ -901,14 +1069,21 @@ class AplicacionEmociones(ctk.CTk):
     def _cambiar_pestana(self):
         pestana = self.pestanas.get()
         if pestana == PESTANA_ESTADISTICAS:
-            self._actualizar_estadisticas()
+            self._recargar_estadisticas()
         elif pestana == PESTANA_HISTORIAL:
-            self._actualizar_historial()
+            self._recargar_historial()
+
+    def _recargar_estadisticas(self):
+        self._refrescar_sesiones()
+        self._actualizar_estadisticas()
 
     def _actualizar_estadisticas(self):
-        estadisticas = obtener_estadisticas(self.ruta_bd)
+        estadisticas = obtener_estadisticas(
+            self.ruta_bd, sesion_id=self._sesion_filtrada(self.combo_sesion_estadisticas),
+        )
         frecuente = emocion_frecuente(estadisticas)
         self.kpi_total.configure(text=str(estadisticas["total"]))
+        self.kpi_lecturas.configure(text=str(estadisticas["lecturas"]))
         self.kpi_frecuente.configure(
             text=nombre_visible(frecuente),
             text_color=color_emocion(frecuente) if frecuente else COLOR_TEXTO,
@@ -951,7 +1126,9 @@ class AplicacionEmociones(ctk.CTk):
     def _mostrar_ultimos(self):
         for widget in self.lista_ultimos.winfo_children():
             widget.destroy()
-        registros = listar_historial(self.ruta_bd, ULTIMOS_ANALISIS)
+        registros = listar_historial(
+            self.ruta_bd, ULTIMOS_ANALISIS, sesion_id=self._sesion_filtrada(self.combo_sesion_estadisticas),
+        )
         if not registros:
             ctk.CTkLabel(
                 self.lista_ultimos, text="Sin registros todavía", font=FUENTE_NORMAL,
@@ -1000,6 +1177,11 @@ class AplicacionEmociones(ctk.CTk):
 
         barra = ctk.CTkFrame(panel, fg_color=COLOR_TRANSPARENTE)
         barra.pack(fill="x", padx=MARGEN, pady=(0, SEPARACION))
+        caja, self.combo_sesion_historial = self._crear_combo(
+            barra, "Sesión", [TODAS_LAS_SESIONES], comando=lambda _: self._actualizar_historial(),
+            ancho=ANCHO_COMBO_SESION,
+        )
+        caja.pack(side="left", padx=(0, SEPARACION))
         caja, self.combo_emocion = self._crear_combo(
             barra, "Emoción", [TODAS] + [nombre_visible(emocion) for emocion in EMOCIONES],
             comando=lambda _: self._mostrar_historial(),
@@ -1007,7 +1189,7 @@ class AplicacionEmociones(ctk.CTk):
         caja.pack(side="left")
         self._crear_boton(barra, "Exportar CSV", self._exportar_csv).pack(side="right", anchor="s")
         self._crear_boton(
-            barra, "Actualizar", self._actualizar_historial, principal=False,
+            barra, "Actualizar", self._recargar_historial, principal=False,
         ).pack(side="right", anchor="s", padx=SEPARACION)
 
         marco = tk.Frame(panel, bg=COLOR_BORDE, bd=0)
@@ -1023,8 +1205,14 @@ class AplicacionEmociones(ctk.CTk):
         desplazamiento.pack(side="right", fill="y", padx=(0, BORDE), pady=BORDE)
         self.tabla.pack(side="left", fill="both", expand=True, padx=(BORDE, 0), pady=BORDE)
 
+    def _recargar_historial(self):
+        self._refrescar_sesiones()
+        self._actualizar_historial()
+
     def _actualizar_historial(self):
-        self.registros = listar_historial(self.ruta_bd, LIMITE_MAXIMO)
+        self.registros = listar_historial(
+            self.ruta_bd, LIMITE_MAXIMO, sesion_id=self._sesion_filtrada(self.combo_sesion_historial),
+        )
         self._mostrar_historial()
 
     def _emocion_filtrada(self):
@@ -1039,6 +1227,8 @@ class AplicacionEmociones(ctk.CTk):
                 "", "end",
                 values=(
                     fecha_local(registro["fecha"]),
+                    self.nombres_sesion.get(registro["sesion_id"], SIN_DATO),
+                    nombre_fuente(registro["fuente"]),
                     nombre_visible(registro["emocion"]),
                     texto_confianza(registro["confianza"]),
                     segunda_emocion(registro["todas"]),

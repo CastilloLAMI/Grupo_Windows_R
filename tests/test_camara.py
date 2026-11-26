@@ -11,7 +11,7 @@ from src.camara import (
     color_emocion_bgr, COLOR_DEFECTO_BGR, dibujar_resultados, guardar_resultado_cuadro,
     recortar_rostro, resumen_grupo, toca_analizar,
 )
-from src.historial import inicializar_bd, listar_historial
+from src.historial import iniciar_sesion, inicializar_bd, listar_historial, obtener_estadisticas
 from src.preprocess import EMOCIONES
 
 ALTO = 240
@@ -237,6 +237,17 @@ class TestGuardarResultado(unittest.TestCase):
     def test_sin_rostros_no_guarda_nada(self):
         self.assertEqual(guardar_resultado_cuadro({"rostros": []}, self.ruta), 0)
         self.assertEqual(listar_historial(self.ruta), [])
+        self.assertEqual(obtener_estadisticas(self.ruta)["lecturas"], 1)
+
+    def test_guarda_en_la_sesion_indicada(self):
+        sesion_id = iniciar_sesion("Matemática", "5.º A", ruta=self.ruta)
+        resultado = {"rostros": [
+            {"caja": (0, 0, 10, 10), "emocion": "sorpresa", "confianza": 70.0,
+             "todas": distribucion(sorpresa=70.0)},
+        ], "predominante": "sorpresa"}
+        guardar_resultado_cuadro(resultado, self.ruta, sesion_id=sesion_id)
+        registro = listar_historial(self.ruta, sesion_id=sesion_id)[0]
+        self.assertEqual((registro["emocion"], registro["fuente"]), ("sorpresa", "camara"))
 
 
 class TestDibujo(unittest.TestCase):

@@ -7,6 +7,7 @@ from unittest import mock
 from PIL import Image
 
 from src.app import crear_app
+from src.historial import cerrar_sesion, iniciar_sesion
 from src.preprocess import EMOCIONES
 
 
@@ -44,6 +45,7 @@ class TestApi(unittest.TestCase):
         self.assertIn("/predecir", rutas)
         self.assertIn("/estadisticas", rutas)
         self.assertIn("/historial", rutas)
+        self.assertIn("/sesiones", rutas)
 
     def test_predecir_ok(self):
         respuesta = self.cliente.post("/predecir", data=imagen_png())
@@ -59,7 +61,9 @@ class TestApi(unittest.TestCase):
         self.assertEqual(len(historial), 1)
         self.assertEqual(historial[0]["emocion"], "felicidad")
         self.assertEqual(historial[0]["confianza"], 90.0)
-        self.assertEqual(historial[0]["todas"], {"felicidad": 90.0})
+        self.assertEqual(historial[0]["todas"]["felicidad"], 90.0)
+        self.assertEqual(set(historial[0]["todas"]), set(EMOCIONES))
+        self.assertEqual(historial[0]["fuente"], "imagen")
 
     def test_estadisticas_vacias(self):
         datos = self.cliente.get("/estadisticas").get_json()
@@ -130,6 +134,38 @@ class TestApi(unittest.TestCase):
 
     def test_crea_detector_por_defecto(self):
         self.assertIsNotNone(crear_app(ruta_bd=self.ruta_bd))
+
+    def test_sesiones_vacias(self):
+        self.assertEqual(self.cliente.get("/sesiones").get_json(), [])
+
+    def test_predecir_se_guarda_en_la_sesion_activa(self):
+        sesion_id = iniciar_sesion("Matemática", "5.º A", ruta=self.ruta_bd)
+        self.cliente.post("/predecir", data=imagen_png())
+        cerrar_sesion(sesion_id, self.ruta_bd)
+        self.cliente.post("/predecir", data=imagen_png())
+
+        sesiones = self.cliente.get("/sesiones").get_json()
+        self.assertEqual(len(sesiones), 1)
+        self.assertEqual(sesiones[0]["detecciones"], 1)
+        self.assertFalse(sesiones[0]["activa"])
+
+        de_la_sesion = self.cliente.get(f"/historial?sesion_id={sesion_id}").get_json()
+        self.assertEqual(len(de_la_sesion), 1)
+        self.assertEqual(de_la_sesion[0]["sesion_id"], sesion_id)
+        self.assertEqual(len(self.cliente.get("/historial").get_json()), 2)
+
+        estadisticas = self.cliente.get(f"/estadisticas?sesion_id={sesion_id}").get_json()
+        self.assertEqual(estadisticas["total"], 1)
+        self.assertEqual(estadisticas["lecturas"], 1)
+
+    def test_sesion_id_invalido(self):
+        for ruta in ("/historial", "/estadisticas"):
+            with self.subTest(ruta=ruta):
+                respuesta = self.cliente.get(f"{ruta}?sesion_id=abc")
+                self.assertEqual(respuesta.status_code, 400)
+                respuesta = self.cliente.get(f"{ruta}?sesion_id=999")
+                self.assertEqual(respuesta.status_code, 404)
+                self.assertIn("999", respuesta.get_json()["error"])
 
 
 if __name__ == "__main__":
