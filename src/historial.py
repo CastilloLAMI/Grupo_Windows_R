@@ -215,6 +215,14 @@ def _insertar_lectura(conexion, sesion_id, fecha, fuente, rostros, predominante)
     return lectura_id
 
 
+def _avisar(rostros):
+    try:
+        from src.notificaciones import notificar_rostros
+    except ImportError:
+        from notificaciones import notificar_rostros
+    notificar_rostros(rostros)
+
+
 def guardar_lectura(resultado, fuente, sesion_id=None, ruta=RUTA_POR_DEFECTO):
     """Guarda una lectura con todos sus rostros y devuelve el id de la lectura.
 
@@ -225,9 +233,11 @@ def guardar_lectura(resultado, fuente, sesion_id=None, ruta=RUTA_POR_DEFECTO):
     if fuente not in FUENTES:
         raise ValueError(f"Fuente no válida: {fuente}")
     with conexion_bd(ruta) as conexion:
-        return _insertar_lectura(
+        lectura_id = _insertar_lectura(
             conexion, sesion_id, ahora_utc(), fuente, resultado["rostros"], resultado.get("predominante"),
         )
+    _avisar(resultado["rostros"])
+    return lectura_id
 
 
 def guardar_analisis(resultado, ruta=RUTA_POR_DEFECTO, sesion_id=None):
@@ -235,6 +245,7 @@ def guardar_analisis(resultado, ruta=RUTA_POR_DEFECTO, sesion_id=None):
     fecha = ahora_utc()
     with conexion_bd(ruta) as conexion:
         _insertar_lectura(conexion, sesion_id, fecha, FUENTE_IMAGEN, [resultado], resultado["emocion"])
+    _avisar([resultado])
     return fecha
 
 

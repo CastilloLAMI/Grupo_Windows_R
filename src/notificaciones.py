@@ -38,3 +38,17 @@ def notificar_deteccion(emocion, confianza, curso=""):
     hilo = threading.Thread(target=enviar_telegram, args=(texto,), daemon=True)
     hilo.start()
     return True
+
+
+def notificar_rostros(rostros):
+    """Envía un solo aviso por lectura (el rostro de mayor confianza)."""
+    alertas = [
+        r for r in rostros
+        if debe_notificar(r["emocion"], r["confianza"])
+    ]
+    if not alertas:
+        return False
+    mayor = max(alertas, key=lambda r: r["confianza"])
+    return notificar_deteccion(
+        mayor["emocion"], mayor["confianza"], f"en {len(alertas)} rostro(s)"
+    )
