@@ -1,160 +1,254 @@
-==================================================
-PLAN: EMOTICONTIGO
-==================================================
-
 # EmotiContigo
 
-## Equipo: Windows + R
-- Ivan Ramiro Castillo Mamani  — Desarrollador Backend
-- Ruth Estefani Huaman Mamani — Desarrollador Fullstack
-- Eduardo Puma Ccorimanya — Desarrollador Frontend
-- Rebeca Yasbet Rocca Ramos — Ingeniero ML / IA
-- Avance: Implementación del modelo Face-Emotion-Detection para clasificación de expresiones.
-- Junior Jeferson Sottec Velasque — QA / Testing
-- Ayde Mirian Condori Valencia — QA / Testing
+Sistema que reconoce expresiones faciales de los estudiantes durante la clase y le muestra al docente un resumen del estado emocional del grupo. Es una herramienta de apoyo a la observación: no evalúa ni califica a nadie.
 
-## Problema
-Hoy en día en la sociedad muchas de las personas entre ellas niños presentan dificultades en lo que son sus aprendizajes, tienen dificultades para expresar sus emociones o encontrar orientación cuando atraviesan momentos complicados mostrando asi dificultades de aprendizaje. 
+Proyecto final de Construcción de Software, Universidad Continental. Equipo **Windows + R**.
 
-## Solucion
-Desarrollaremos un sistema de inteligencia artificial que utilizara una camara para capturar imagenes de las expresiones faciales de los estudiantes durante las clases . Mediante un modelo de reconocimiento facial de expresiones , el sistema analizara las imagenes y clasificara expresiones como alegría, tristeza, sorpresa o neutralidad. Los resultados se mostraran en un interfaz con graficos y estadisticas para apoyar la observación del docente, sin asumir que las expresiones determinen si un niño aprendio o no.
+![Pestaña Clase en vivo](docs/mockup/01-clase-en-vivo.png)
 
-## Alcance del Proyecto
+## Contenido
 
-EmotiContigo es una herramienta de **apoyo a la observación docente**. Su alcance está delimitado de forma explícita para garantizar un uso ético y responsable de la inteligencia artificial en el aula.
+- [Problemática](#problemática)
+- [Objetivo](#objetivo)
+- [Público objetivo](#público-objetivo)
+- [Tecnologías](#tecnologías)
+- [Funcionalidades](#funcionalidades)
+- [Modelo de inteligencia artificial](#modelo-de-inteligencia-artificial)
+- [Ejecutar con Docker](#ejecutar-con-docker)
+- [Instalación local](#instalación-local)
+- [Pruebas y calidad](#pruebas-y-calidad)
+- [API](#api)
+- [Base de datos](#base-de-datos)
+- [Alcance ético](#alcance-ético)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Equipo](#equipo)
 
-### Lo que el sistema SÍ hace
+## Problemática
 
-- Captura imágenes de expresiones faciales de los estudiantes durante la clase.
-- Clasifica las expresiones en 7 emociones (enfadado, asco, miedo, felicidad, tristeza, sorpresa, neutral) con su porcentaje de confianza.
-- Muestra gráficos y estadísticas al docente para apoyar su observación del aula.
-- Guarda un historial de análisis (emoción y confianza) en SQLite, organizado por sesiones de clase, para consulta posterior.
-- Actúa como **intermediario** entre el estudiante y el docente, facilitando la identificación de estados emocionales.
+En un aula con 25 o 30 estudiantes, el docente no puede estar pendiente de cómo reacciona cada uno durante la clase. Muchos niños tienen problemas para expresar lo que sienten o no piden ayuda cuando algo no les queda claro o cuando pasan por un mal momento. Esas señales se pierden y el docente se entera tarde, o no llega a enterarse.
 
-### Lo que el sistema NO hace (restricciones del alcance)
+## Objetivo
 
-- **No se involucra en el desarrollo del estudiante.** No interviene en su proceso formativo ni emite juicios sobre su evolución personal.
-- **No es parte del proceso ni del rendimiento académico.** No evalúa, califica ni condiciona la nota del estudiante.
-- **No determina si un niño aprendió o no.** Las expresiones faciales no se interpretan como indicadores de aprendizaje.
-- **No sustituye el criterio del docente.** El sistema solo presenta información; la interpretación y la acción pedagógica son responsabilidad del docente.
-- **No almacena imágenes de los rostros.** El historial guarda únicamente la emoción detectada y el nivel de confianza, no la fotografía.
+Desarrollar una aplicación que capture con la cámara las expresiones faciales del grupo, las clasifique con un modelo de IA y presente al docente gráficos y estadísticas por sesión de clase, para que tenga un dato más al momento de observar a sus estudiantes.
 
-### Criterios de calidad del alcance
+## Público objetivo
 
-El alcance incluye criterios no funcionales verificables mediante pruebas automatizadas:
+- **Usuario directo:** docentes de educación básica que dictan clases presenciales.
+- **Población observada:** los estudiantes del aula. El sistema no los identifica: cada rostro se registra como una detección anónima.
 
-- **Cobertura de pruebas mínima:** 60% (`fail_under = 60` en `.coveragerc`).
-- **Integración continua:** GitHub Actions ejecuta las pruebas en cada push a `main` y `develop`, y en pull requests a `main`.
-- **Compatibilidad:** Python 3.10 y 3.11.
-- **Calidad de código:** lint con `flake8` (max-line-length = 120).
-- **Enfoque TDD:** el alcance ético se traduce en pruebas unitarias que protegen las restricciones anteriores.
+## Tecnologías
 
-### Trazabilidad del alcance
-
-| Restricción del alcance | Prueba que la protege |
+| Área | Herramienta |
 |---|---|
-| No se involucra en el desarrollo del estudiante | `test_el_sistema_no_se_involucra_en_el_desarrollo_del_estudiante` |
-| Solo es un intermediario entre estudiante y docente | `test_solo_ser_un_intermediario_entre_el_estudiante_y_el_docente` |
-| No es parte del proceso ni rendimiento académico | `test_el_sistema_no_es_parte_del_proceso_o_rendimiento_academico_del_estudiante` |
-| El sistema produce un resultado válido | `test_resultado_esperado` |
-| No almacena imágenes de los rostros | `test_ninguna_tabla_guarda_imagenes` (en `tests/test_historial.py`) |
+| Lenguaje | Python 3.10 / 3.11 |
+| Interfaz de escritorio | customtkinter, ttk (tabla del historial), matplotlib (gráficos) |
+| Cámara y rostros | OpenCV (clasificador Haar) |
+| Modelo de IA | Hugging Face Transformers + PyTorch |
+| API y página web | Flask, gunicorn |
+| Base de datos | SQLite |
+| Pruebas | unittest (TDD), coverage, flake8 |
+| Despliegue | Docker y Docker Compose |
+| CI/CD | GitHub Actions |
 
-> **Nota:** estas pruebas se encuentran en `tests/` y se ejecutan con `python -m unittest discover -s tests -v`.
+## Funcionalidades
 
-## Modelo de IA
-- **Categoria:** image-classification
-- **Modelo:** [Face-emotion-detection](https://huggingface.co/abhilash88/face-emotion-detection)
-- **Input:** foto del rostro del niño de jpg o png
-- **Output:** emocion detectado de las 7 clases con porcentaje
-- **Justificacion:** Elegimos este modelo porque porque ya viene entrenado para reconocer rostros lo cual nos va ayudar a capturar las emociones de la población que elegimos en este caso los niños y tambien podemos reentrenarlo.
+La aplicación de escritorio (`python -m src.interfaz`) tiene cuatro pestañas:
 
-## Dataset
-- **Nombre:** FER2013
-- **Registros:** 35877
-- **Columnas:** Imgen (pixels): Matriz de 48 *48 pixeles en escala de grises que capturan el rostro del alumno. Etiqueta(label): Valor entero del 0 al 6 que clasifica el estado emocional facial 0:enfadado 1: asco 2: miedo 3:Felicidad 4: tristeza 5: sorpresa 6 : Neutral
+| Pestaña | Qué hace |
+|---|---|
+| Clase en vivo | Se abre una sesión de clase (curso, grado y sección, docente opcional). La cámara analiza el aula cada 5, 10 o 30 segundos, dibuja un recuadro con la emoción sobre cada rostro y muestra el resumen del grupo: rostros detectados, emoción predominante, distribución promedio y últimas lecturas. El botón *Capturar ahora* analiza en el momento. |
+| Analizar imagen | Analiza una fotografía jpg o png. Si hay una sesión abierta, el resultado se guarda en ella. |
+| Estadísticas | Por sesión o de todas: total de expresiones, lecturas, emoción más frecuente, confianza promedio y gráfico por emoción. |
+| Historial | Las últimas 100 detecciones con filtros por sesión y emoción. Se puede exportar a CSV. |
 
-## Stack
-- **Lenguaje:** python
-- **Framework:** flask
-- **ML:** Hugging Face Transformers
-- **Testing:** unittest + TDD
-- **Interfaz:** customtkinter + ttk, OpenCV para la cámara
-- **Base de datos:** SQLite
-- **Despliegue:** Docker y Docker Compose (gunicorn)
-- **CI/CD:** GitHub Actions (pruebas, lint y construcción de la imagen Docker)
+La cámara se lee y se analiza en un hilo aparte (`MonitorCamara` en `src/camara.py`), así la ventana no se congela mientras el modelo trabaja.
 
-## Instalacion
+**Validaciones y manejo de errores**
+
+- Solo se aceptan imágenes jpg o png de hasta 5 MB. Un archivo corrupto o con otra extensión devuelve un error claro y no detiene la aplicación.
+- El límite del historial debe estar entre 1 y 100, y `sesion_id` debe ser un entero que exista (error 400 o 404 según el caso).
+- Solo puede haber una sesión abierta. Si la aplicación se cierra sin terminar la sesión, al volver a abrirla se retoma.
+- Al arrancar, la API revisa que ninguna ruta viole el alcance ético del sistema. Si alguna lo hace, no inicia.
+
+Los mockups de las cuatro pantallas están en [`docs/mockup/`](docs/mockup/).
+
+## Modelo de inteligencia artificial
+
+### Qué modelo usamos
+
+[`abhilash88/face-emotion-detection`](https://huggingface.co/abhilash88/face-emotion-detection), un Vision Transformer (ViT-Base) entrenado con FER2013 para clasificar imágenes (`image-classification`).
+
+### Por qué lo elegimos
+
+- Ya viene entrenado para reconocer expresiones faciales, así que no partimos de cero con un dataset de solo 35 mil imágenes.
+- Reconoce las 7 emociones de FER2013, que es el estándar en este tipo de problemas.
+- Se usa con pocas líneas a través de `pipeline` de Transformers y funciona en CPU, que es lo que hay en una PC de aula.
+- Se puede reentrenar. Lo hicimos (ver abajo) y mejoró en las 7 clases.
+
+### Entrada y salida
+
+- **Entrada:** la imagen del rostro (jpg o png, o el recorte de un cuadro de la cámara), convertida a RGB.
+- **Salida:** la emoción principal, su porcentaje de confianza y el porcentaje de cada una de las 7 emociones.
+
+```json
+{
+  "emocion": "felicidad",
+  "confianza": 91.37,
+  "todas": {"felicidad": 91.37, "neutral": 4.12, "sorpresa": 2.05, "tristeza": 1.10,
+            "enfado": 0.71, "miedo": 0.48, "asco": 0.17}
+}
+```
+
+### Flujo dentro del sistema
+
+1. OpenCV toma un cuadro de la cámara y el clasificador Haar ubica los rostros.
+2. Cada rostro se recorta y pasa por `DetectorEmociones.predecir()` (`src/model.py`).
+3. `AnalizadorAula` junta los resultados de todos los rostros y calcula la emoción predominante y la distribución del grupo.
+4. Se guarda la lectura en SQLite (solo emociones y porcentajes, nunca la imagen) y se actualiza la interfaz.
+
+### Dataset y ajuste fino
+
+- **Dataset:** FER2013, 35 887 imágenes de 48×48 píxeles en escala de grises, 7 clases (0 enfado, 1 asco, 2 miedo, 3 felicidad, 4 tristeza, 5 sorpresa, 6 neutral).
+- **Partición original:** 28 709 de entrenamiento, 3 589 de validación y 3 589 de prueba.
+- **Ajuste:** 3 épocas, tasa de aprendizaje 2e-5, lote 64, pesos por clase para compensar el desbalance y aumentos de datos. Notebook en [`notebooks/entrenamiento_emociones.ipynb`](notebooks/entrenamiento_emociones.ipynb) (Google Colab, GPU T4).
+
+| Métrica (3 589 imágenes de prueba) | Modelo original | Modelo ajustado |
+|---|---|---|
+| Exactitud | 71.7 % | 73.0 % |
+| F1 macro | 0.700 | 0.718 |
+
+El detalle por emoción y las matrices de confusión están en [`docs/entrenamiento/`](docs/entrenamiento/). El modelo ajustado pesa unos 330 MB y no se sube a GitHub; para usarlo, se define `EMOTI_MODELO` con la carpeta del modelo.
+
+### Limitaciones
+
+- **Entrenado con adultos.** FER2013 tiene sobre todo rostros de adultos, y nuestro público son niños. Lo más probable es que la precisión real en un aula sea menor que el 73 % medido.
+- **No todas las emociones se reconocen igual de bien.** Felicidad (F1 0.92) y sorpresa (0.82) salen bien; miedo (0.58) y tristeza (0.59) fallan bastante más.
+- **Se confunde entre expresiones parecidas:** tristeza con neutral, asco con enfado, miedo con tristeza. A una persona también le cuesta distinguirlas.
+- **Poca data de asco:** solo 55 imágenes en la parte de prueba, así que esa métrica es poco confiable.
+- **Depende de la cámara y la luz.** El clasificador Haar solo detecta rostros de frente; con poca luz, perfiles, mascarillas o estudiantes lejos de la cámara, se pierden rostros.
+- **Una expresión no es una emoción.** Un niño puede estar serio y no estar triste. Por eso el resultado se presenta como apoyo al docente y nunca como diagnóstico o evaluación.
+- **El endpoint `/predecir` analiza la imagen completa.** No recorta el rostro como sí lo hace la cámara, así que funciona mejor con fotos donde la cara ocupa casi todo el cuadro.
+
+## Ejecutar con Docker
+
+El contenedor lleva la API Flask con el modelo, la base de datos y una página web de demostración en `http://localhost:5000`, donde se sube una foto y se ven la emoción detectada, las estadísticas y el historial.
+
+**Requisitos:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) en Windows o Mac (en Windows necesita WSL 2) o Docker Engine en Linux. La primera construcción descarga PyTorch y el modelo (unos 700 MB) y tarda varios minutos; la imagen ocupa alrededor de 2,4 GB. Las siguientes construcciones usan la caché y tardan segundos.
+
+### Con Docker Compose (recomendado)
+
+```bash
+docker compose up --build    # construye la imagen y levanta el servicio
+# abrir http://localhost:5000
+docker compose logs -f       # ver los registros
+docker compose down          # detener (los datos se quedan en el volumen emoti-datos)
+```
+
+### Solo con Docker
+
+```bash
+docker build -t emoticontigo .
+docker run -d --name emoticontigo -p 5000:5000 -v emoti-datos:/datos emoticontigo
+docker ps                    # en STATUS debe aparecer (healthy)
+```
+
+### Qué hace el Dockerfile
+
+| Paso | Por qué |
+|---|---|
+| `FROM python:3.11-slim` | Imagen base liviana con Python. |
+| Copia `requirements-docker.txt` e instala dependencias antes de copiar el código | Docker reutiliza esa capa si solo cambia el código, así que reconstruir tarda segundos. |
+| PyTorch solo para CPU | La imagen pesa unos 2 GB menos que con CUDA, y una PC de aula no tiene GPU. |
+| Usuario `emoti` (uid 1000) en vez de root | El proceso corre sin privilegios de administrador. |
+| Descarga el modelo al construir (`DESCARGAR_MODELO=1`) y activa `HF_HUB_OFFLINE` | El contenedor funciona sin internet. |
+| `VOLUME /datos` con `EMOTI_BD=/datos/emoticontigo.db` | La base SQLite sobrevive a reinicios y reconstrucciones. |
+| `EMOTI_PRECARGAR=1` | El modelo se carga al arrancar y el primer análisis no tiene que esperar. |
+| `HEALTHCHECK` contra `/salud` | Docker sabe si la API responde. |
+| `gunicorn` con 1 proceso y 4 hilos | Servidor de producción; el modelo se carga una sola vez en memoria. |
+
+**Opciones**
+
+- Modelo ajustado: descomprimir `modelo_emoticontigo.zip` en `modelos/` y descomentar `EMOTI_MODELO` en `docker-compose.yml`. La carpeta se monta en solo lectura.
+- Imagen más liviana: `docker build --build-arg DESCARGAR_MODELO=0 -t emoticontigo .` (el modelo se descarga al primer uso y necesita internet).
+
+### Por qué la app de escritorio no va en el contenedor
+
+La interfaz de escritorio y la cámara necesitan la pantalla y la cámara USB de la PC. En Windows y Mac, Docker Desktop no puede pasar una cámara USB al contenedor ni mostrar ventanas sin instalar aparte un servidor gráfico. Por eso el contenedor lleva la parte portable (API, modelo, base de datos y página web), y la app de escritorio se ejecuta directamente en la PC del aula.
+
+## Instalación local
+
+Requiere Python 3.10 o 3.11 y Git.
+
 ```bash
 git clone https://github.com/CastilloLAMI/Grupo_Windows_R.git
 cd Grupo_Windows_R
 python -m venv venv
-venv\\Scripts\\activate
+```
+
+Activar el entorno virtual:
+
+```bash
+# Windows (PowerShell o CMD)
+venv\Scripts\activate
+
+# Linux / macOS
+source venv/bin/activate
+```
+
+Instalar dependencias y ejecutar:
+
+```bash
 pip install -r requirements.txt
+
+python -m src.interfaz   # aplicación de escritorio
+python -m src.app        # solo la API, en http://localhost:5000
+python -m src.camara     # cámara en ventana simple (tecla q para salir)
 ```
 
-## Tests
+La primera vez que se usa el modelo, se descarga de Hugging Face (necesita internet).
+
+> En Windows, si PowerShell no deja activar el entorno, ejecutar una vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. Conviene clonar el proyecto fuera de OneDrive, porque sincronizar el `venv` vuelve lenta la PC.
+
+**Variables de entorno**
+
+| Variable | Para qué | Valor por defecto |
+|---|---|---|
+| `EMOTI_BD` | Ruta del archivo SQLite | `emoticontigo.db` |
+| `EMOTI_MODELO` | Carpeta del modelo ajustado (con `config.json` y `model.safetensors`) | modelo de Hugging Face |
+| `EMOTI_PRECARGAR` | `1` carga el modelo al iniciar la API | sin precarga |
+
+## Pruebas y calidad
+
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -s tests -v             # pruebas
+python -m coverage run -m unittest discover -s tests
+python -m coverage report                           # cobertura (mínimo 60 %)
+flake8 src tests --max-line-length=120              # estilo
 ```
 
-## Docker
-
-El contenedor ejecuta la **API Flask con el modelo de IA** y una **página web de demostración** en `http://localhost:5000`, donde se sube una foto, se ve la emoción detectada y se consultan las estadísticas y el historial.
-
-### Requisitos
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows o Mac) o Docker Engine (Linux).
-- La primera construcción descarga PyTorch y el modelo (unos 700 MB; la imagen ocupa alrededor de 2,4 GB en disco) y tarda varios minutos. Las siguientes reutilizan la caché.
-
-### Con Docker Compose (recomendado)
-```bash
-docker compose up --build        # construye la imagen y levanta el servicio
-# abrir http://localhost:5000
-docker compose logs -f           # ver los registros
-docker compose down              # detener (los datos se conservan en el volumen emoti-datos)
-```
-
-### Solo con Docker
-```bash
-docker build -t emoticontigo .
-docker run -d --name emoticontigo -p 5000:5000 -v emoti-datos:/datos emoticontigo
-docker ps                        # la columna STATUS debe decir (healthy)
-```
-
-### Qué hace el Dockerfile
-| Paso | Por qué |
-|---|---|
-| `FROM python:3.11-slim` | Imagen base liviana con Python. |
-| Copia `requirements-docker.txt` e instala dependencias **antes** del código | Docker reutiliza esa capa si solo cambia el código; reconstruir tarda segundos. |
-| PyTorch **solo CPU** | La imagen pesa unos 2 GB menos que con CUDA; el aula no tiene GPU. |
-| Usuario `emoti` (uid 1000), no root | Seguridad: el proceso no tiene privilegios de administrador. |
-| Descarga el modelo al construir (`DESCARGAR_MODELO=1`) y activa `HF_HUB_OFFLINE` | El contenedor funciona **sin internet** durante la demostración. |
-| `VOLUME /datos` con `EMOTI_BD=/datos/emoticontigo.db` | La base SQLite sobrevive a reinicios y reconstrucciones del contenedor. |
-| `EMOTI_PRECARGAR=1` | El modelo se carga al arrancar: el primer análisis no espera. |
-| `HEALTHCHECK` contra `/salud` | Docker sabe si la API responde (`healthy`). |
-| `gunicorn` con 1 proceso y 4 hilos | Servidor de producción; el modelo se carga una sola vez en memoria. |
-
-### Opciones
-- **Modelo ajustado:** descomprime `modelo_emoticontigo.zip` en `modelos/` y descomenta `EMOTI_MODELO` en `docker-compose.yml`. La carpeta se monta en solo lectura.
-- **Imagen más liviana:** `docker build --build-arg DESCARGAR_MODELO=0 -t emoticontigo .` (el modelo se descarga al primer uso; necesita internet).
-- **Pruebas:** el job `docker` de GitHub Actions construye la imagen, levanta el contenedor, espera a que esté `healthy`, analiza una imagen y comprueba que los datos sobreviven a un reinicio.
-
-### Por qué la app de escritorio no va en el contenedor
-La interfaz Tkinter y la cámara necesitan la pantalla y la cámara USB de la PC. En Windows y Mac, Docker Desktop no puede pasar la cámara USB a un contenedor ni mostrar ventanas sin instalar un servidor gráfico aparte. Por eso el contenedor lleva la parte portable (API, modelo, base de datos y página web) y la app de escritorio se ejecuta en la PC del aula con `python -m src.interfaz`.
+- Más de 150 pruebas unitarias y de integración; la cámara, los rostros y el modelo se simulan para que corran sin hardware ni internet.
+- GitHub Actions corre lint y pruebas con Python 3.10 y 3.11 en cada push y pull request a `main` y `develop`. También construye la imagen Docker, levanta el contenedor, espera a que esté `healthy`, analiza una imagen y comprueba que los datos sigan ahí después de reiniciarlo.
 
 ## API
-- `GET /` → página web de demostración.
-- `GET /salud` → estado del servicio.
-- `POST /predecir` → recibe una imagen en el campo `imagen` (jpg/png, máximo 5 MB).
-- `GET /estadisticas` → total de análisis, conteo por emoción y confianza promedio.
-- `GET /historial?limite=50&sesion_id=3` → últimas detecciones (límite entre 1 y 100); `sesion_id` es opcional.
-- `GET /sesiones` → sesiones de clase con su cantidad de lecturas y detecciones.
-- `GET /estadisticas?sesion_id=3` → estadísticas de una sesión (sin `sesion_id`, de todas).
 
-`POST /predecir` guarda el análisis en la sesión de clase abierta, si hay una.
+| Método y ruta | Descripción |
+|---|---|
+| `GET /` | Página web de demostración |
+| `GET /salud` | Estado del servicio |
+| `POST /predecir` | Recibe una imagen en el campo `imagen` (jpg/png, máximo 5 MB) y devuelve la emoción. Si hay una sesión abierta, la guarda en ella. |
+| `GET /estadisticas?sesion_id=3` | Total de análisis, conteo por emoción y confianza promedio. Sin `sesion_id`, de todas las sesiones. |
+| `GET /historial?limite=50&sesion_id=3` | Últimas detecciones (límite entre 1 y 100; `sesion_id` opcional) |
+| `GET /sesiones` | Sesiones de clase con su cantidad de lecturas y detecciones |
+
+Ejemplo:
+
+```bash
+curl -F "imagen=@rostro.jpg" http://localhost:5000/predecir
+```
 
 ## Base de datos
 
-El historial se guarda en **SQLite**, en el archivo `emoticontigo.db` (la ruta se puede cambiar con la variable `EMOTI_BD`). El esquema está en [`db/esquema.sql`](db/esquema.sql) y hay consultas de ejemplo en [`db/consultas.sql`](db/consultas.sql). La aplicación crea las tablas al iniciar.
+El historial se guarda en SQLite, en `emoticontigo.db` (se cambia con `EMOTI_BD`). El esquema está en [`db/esquema.sql`](db/esquema.sql) y hay consultas de ejemplo en [`db/consultas.sql`](db/consultas.sql). La aplicación crea las tablas al iniciar.
 
 ```mermaid
 erDiagram
@@ -191,51 +285,77 @@ erDiagram
     }
 ```
 
-- **sesion:** una clase. Solo puede haber una abierta; si la app se cierra sin terminarla, se retoma al volver a abrirla.
-- **lectura:** cada análisis, de un cuadro de la cámara o de una fotografía. Una lectura de la cámara sin rostros también se guarda (`total_rostros = 0`).
+- **sesion:** una clase. Solo puede haber una abierta.
+- **lectura:** cada análisis, de un cuadro de la cámara o de una foto. Una lectura sin rostros también se guarda (`total_rostros = 0`).
 - **deteccion:** cada rostro de una lectura, con su emoción principal y el porcentaje de las 7 emociones.
-- **Reglas en la base:** claves foráneas con borrado en cascada, `CHECK` para que la emoción sea una de las 7 del modelo, los porcentajes estén entre 0 y 100 y la fuente sea válida, e índices por sesión, fecha y emoción.
-- **Privacidad:** no hay columnas para imágenes ni datos que identifiquen a un estudiante; cada detección es un rostro anónimo. Una prueba verifica que ninguna tabla tenga columnas como `imagen`, `foto` o `rostro`.
+- **Reglas:** claves foráneas con borrado en cascada; `CHECK` para que la emoción sea una de las 7, los porcentajes estén entre 0 y 100 y la fuente sea válida; índices por sesión, fecha y emoción.
+- **Privacidad:** no hay columnas para imágenes ni para datos que identifiquen a un estudiante. Una prueba revisa que ninguna tabla tenga columnas como `imagen`, `foto` o `rostro`.
 - **Migración:** si existe una base de la versión anterior (tabla `analisis`), sus registros pasan a una sesión «Historial anterior» y la tabla original se conserva como `analisis_v1`.
 
-### ¿Por qué SQLite?
+**¿Por qué SQLite?** Es una app que usa un docente en la PC del aula. SQLite viene con Python, toda la base es un solo archivo, las transacciones no pierden datos si se apaga la PC y la información de los estudiantes no sale de esa computadora. Su límite es que solo un proceso escribe a la vez. Si el sistema creciera a varias aulas con una base central, habría que pasar a PostgreSQL o MySQL; como todo el acceso a datos está en `src/historial.py`, el cambio quedaría en un solo módulo.
 
-EmotiContigo es una aplicación de escritorio que usa un docente en la PC del aula:
+## Alcance ético
 
-- **Sin instalación ni servidor:** `sqlite3` viene incluido en Python y toda la base es un solo archivo.
-- **Datos seguros:** las transacciones son ACID, así que no se pierden datos si se apaga la PC.
-- **Privacidad:** los datos de los estudiantes no salen de la computadora del aula.
-- **Pruebas y CI:** cada prueba crea una base temporal en un archivo; GitHub Actions no necesita levantar un servidor.
-- **SQL completo:** permite un modelo relacional con claves foráneas, restricciones e índices.
+EmotiContigo apoya la observación del docente y no va más allá de eso. El alcance está escrito en `src/alcance.py` y protegido con pruebas.
 
-Su límite es la concurrencia: un solo proceso escribe a la vez. Si el sistema creciera a varias aulas guardando en una base central, convendría migrar a PostgreSQL o MySQL; como todo el acceso a datos está en `src/historial.py`, ese cambio quedaría en un solo módulo.
+**Lo que sí hace**
 
-## Interfaz de escritorio
-```bash
-python -m src.interfaz
+- Captura y clasifica las expresiones faciales del grupo en 7 emociones con su porcentaje de confianza.
+- Muestra gráficos y estadísticas por sesión de clase.
+- Guarda un historial de emociones y porcentajes, sin imágenes.
+
+**Lo que no hace**
+
+- No evalúa, califica ni influye en la nota del estudiante.
+- No determina si un niño aprendió o no.
+- No interviene en el desarrollo del estudiante ni emite juicios sobre él.
+- No reemplaza el criterio del docente: el sistema muestra información y el docente decide qué hacer con ella.
+- No guarda fotos de los rostros.
+
+| Restricción | Prueba que la protege |
+|---|---|
+| No se involucra en el desarrollo del estudiante | `test_el_sistema_no_se_involucra_en_el_desarrollo_del_estudiante` |
+| Solo es un intermediario entre estudiante y docente | `test_solo_ser_un_intermediario_entre_el_estudiante_y_el_docente` |
+| No es parte del proceso ni del rendimiento académico | `test_el_sistema_no_es_parte_del_proceso_o_rendimiento_academico_del_estudiante` |
+| El sistema produce un resultado válido | `test_resultado_esperado` |
+| No almacena imágenes de los rostros | `test_ninguna_tabla_guarda_imagenes` (en `tests/test_historial.py`) |
+
+## Estructura del repositorio
+
 ```
-Ventana hecha con customtkinter (y `ttk.Treeview` para la tabla del historial), con cuatro pestañas que siguen el mockup de `docs/mockup/`:
-
-- **Clase en vivo:** primero se inicia una **sesión de clase** (curso, grado y sección, y docente opcional). Luego muestra la cámara con un recuadro y la emoción sobre cada rostro. Se elige la cámara y cada cuánto analizar (5, 10 o 30 s); *Capturar ahora* analiza al momento. A la derecha, el resumen del grupo: rostros detectados, emoción predominante, distribución promedio y últimas lecturas.
-- **Analizar imagen:** analiza una fotografía (jpg o png); si hay una sesión abierta, se guarda en ella.
-- **Estadísticas:** por sesión o de todas: expresiones registradas, lecturas, emoción más frecuente, confianza promedio y gráfico por emoción.
-- **Historial:** tabla de las últimas 100 detecciones (con su sesión y fuente), filtros por sesión y por emoción, y exportación a CSV.
-
-La cámara se lee y se analiza en segundo plano (`MonitorCamara` en `src/camara.py`), así la ventana no se congela mientras trabaja el modelo. Cada lectura se guarda en la sesión abierta, con una detección por rostro; las imágenes no se guardan.
-
-La interfaz reutiliza `DetectorEmociones`. Para usar el modelo ajustado, define `EMOTI_MODELO` con la ruta de la carpeta que contiene `config.json` y `model.safetensors` (por ejemplo `modelos/modelo_emoticontigo`).
-
-## Cámara del aula
-```bash
-python -m src.camara
+Grupo_Windows_R/
+├── src/
+│   ├── interfaz.py        # app de escritorio (4 pestañas)
+│   ├── camara.py          # cámara, detección de rostros y análisis del aula
+│   ├── model.py           # DetectorEmociones (modelo de Hugging Face)
+│   ├── app.py             # API Flask
+│   ├── historial.py       # acceso a SQLite
+│   ├── alcance.py         # reglas del alcance ético
+│   ├── preprocess.py      # validación y etiquetas
+│   ├── constantes.py      # límites y valores fijos
+│   └── web/index.html     # página de demostración (Docker)
+├── tests/                 # pruebas unitarias y de integración
+├── db/                    # esquema y consultas SQL
+├── notebooks/             # ajuste fino del modelo (Colab)
+├── docs/
+│   ├── mockup/            # diseño de las pantallas
+│   └── entrenamiento/     # métricas y matrices de confusión
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt         # dependencias completas (app de escritorio y desarrollo)
+├── requirements-docker.txt  # dependencias de la imagen Docker
+└── .github/workflows/ci.yml
 ```
-Abre la cámara, detecta los rostros con el clasificador Haar de OpenCV y analiza cada rostro cada 5 segundos. Muestra un recuadro con la emoción sobre cada rostro (tecla `q` para salir) y guarda en el historial un registro por rostro. No se guardan las imágenes, solo la emoción y la confianza.
 
-El módulo `src/camara.py` no depende de la interfaz: `Camara` abre y lee la cámara, `DetectorRostros` ubica los rostros, `AnalizadorAula` clasifica cada rostro y resume el grupo (emoción predominante y distribución promedio). Sus pruebas están en `tests/test_camara.py` y usan cámaras y rostros simulados.
+## Equipo
 
-## Constantes del proyecto
+| Integrante | Rol |
+|---|---|
+| Ivan Ramiro Castillo Mamani | Backend |
+| Ruth Estefani Huaman Mamani | Fullstack |
+| Eduardo Puma Ccorimanya | Frontend |
+| Rebeca Yasbet Rocca Ramos | ML / IA |
+| Junior Jeferson Sottec Velasque | QA / Testing |
+| Ayde Mirian Condori Valencia | QA / Testing |
 
-Los valores fijos (tamano maximo de imagen, extensiones permitidas, limites del historial y etiquetas de emociones FER2013) estan centralizados en `src/constantes.py` para evitar numeros magicos. Sus pruebas estan en `tests/test_constantes.py`.
-
----
-*Proyecto Final — Construccion de Software — Universidad Continental*
+Trabajamos con GitFlow: cada funcionalidad se desarrolla en su rama `feature/...` y entra a `main` mediante pull request.
