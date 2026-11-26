@@ -1,0 +1,17 @@
+# Lo que NO entra en la imagen Docker
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.coverage
+htmlcov
+*.db
+modelos
+*.zip
+notebooks
+docs
+tests
+.vscode
+.idea

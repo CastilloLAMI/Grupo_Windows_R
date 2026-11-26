@@ -35,3 +35,49 @@ jobs:
         run: |
           python -m coverage run -m unittest discover -s tests -v
           python -m coverage report --fail-under=60
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t emoticontigo:ci .
+
+      - name: Run container
+        run: docker run -d --name emoticontigo -p 5000:5000 emoticontigo:ci
+
+      - name: Wait until healthy
+        run: |
+          for i in $(seq 1 60); do
+            estado=$(docker inspect -f '{{.State.Health.Status}}' emoticontigo)
+            echo "Intento $i: $estado"
+            if [ "$estado" = "healthy" ]; then exit 0; fi
+            sleep 5
+          done
+          docker logs emoticontigo
+          exit 1
+
+      - name: Test API from the container
+        run: |
+          curl -fsS http://localhost:5000/salud
+          curl -fsS http://localhost:5000/ | grep -q EMOTICONTIGO
+          docker exec emoticontigo python -c "from PIL import Image; Image.new('RGB', (224, 224), (200, 170, 150)).save('/tmp/cara.png')"
+          docker cp emoticontigo:/tmp/cara.png cara.png
+          curl -fsS -F "imagen=@cara.png" http://localhost:5000/predecir | tee respuesta.json
+          grep -q '"emocion"' respuesta.json
+          curl -fsS http://localhost:5000/estadisticas | grep -q '"total":1'
+
+      - name: Data survives a restart
+        run: |
+          docker restart emoticontigo
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' emoticontigo)" = "healthy" ] && break
+            sleep 5
+          done
+          curl -fsS http://localhost:5000/estadisticas | grep -q '"total":1'
+
+      - name: Show logs
+        if: always()
+        run: docker logs emoticontigo || true

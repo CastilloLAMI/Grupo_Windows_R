@@ -29,6 +29,7 @@ EMOCIONES_PERMITIDAS = (
 
 # Endpoints que el sistema EXPONE (alcance funcional)
 ENDPOINTS_PERMITIDOS = (
+    "/",
     "/salud",
     "/predecir",
     "/estadisticas",
@@ -137,8 +138,12 @@ def validar_emocion(emocion: str) -> bool:
 
 
 def validar_endpoint(ruta: str) -> bool:
-    """Verifica que el endpoint pertenezca al alcance funcional."""
-    return any(ruta.startswith(e) for e in ENDPOINTS_PERMITIDOS)
+    """Verifica que el endpoint pertenezca al alcance funcional.
+
+    La raíz "/" (página de demostración) solo vale exacta: no habilita
+    cualquier otra ruta que empiece con "/".
+    """
+    return any(ruta == e or (e != "/" and ruta.startswith(e)) for e in ENDPOINTS_PERMITIDOS)
 
 
 # ============================================================

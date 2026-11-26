@@ -1,7 +1,8 @@
 """API Flask de EmotiContigo."""
 import os
+from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from PIL import Image, UnidentifiedImageError
 
 from src.constantes import (
@@ -22,6 +23,9 @@ HTTP_SOLICITUD_INVALIDA = 400
 HTTP_NO_ENCONTRADO = 404
 HTTP_ENTIDAD_DEMASIADO_GRANDE = 413
 MENSAJE_IMAGEN_INVALIDA = "El archivo no es una imagen válida"
+CARPETA_WEB = Path(__file__).resolve().parent / "web"
+PAGINA_INICIO = "index.html"
+VARIABLE_PRECARGA = "EMOTI_PRECARGAR"
 
 
 def validar_archivo(archivos):
@@ -70,11 +74,19 @@ def crear_app(detector=None, ruta_bd=None):
 
     inicializar_bd(app.config["RUTA_BD"])
     detector = detector or DetectorEmociones()
+    if os.getenv(VARIABLE_PRECARGA) == "1" and hasattr(detector, "cargar"):
+        # En Docker el modelo se carga al arrancar: la primera foto no espera
+        detector.cargar()
 
     @app.errorhandler(HTTP_ENTIDAD_DEMASIADO_GRANDE)
     def archivo_demasiado_grande(_error):
         mensaje = f"La imagen supera el límite de {TAMANO_MAXIMO_MB} MB"
         return jsonify({"error": mensaje}), HTTP_ENTIDAD_DEMASIADO_GRANDE
+
+    @app.get("/")
+    def inicio():
+        """Página web de demostración (la usa el contenedor Docker)."""
+        return send_from_directory(CARPETA_WEB, PAGINA_INICIO)
 
     @app.get("/salud")
     def salud():
