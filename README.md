@@ -134,7 +134,7 @@ El detalle por emoción y las matrices de confusión están en [`docs/entrenamie
 
 ## Ejecutar con Docker
 
-El contenedor lleva la API Flask con el modelo, la base de datos y una página web de demostración en `http://localhost:5000`, donde se sube una foto y se ven la emoción detectada, las estadísticas y el historial.
+El contenedor lleva la API Flask con el modelo, OpenCV, la base de datos y una **página web con las mismas cuatro pestañas** que la app de escritorio, en `http://localhost:5000`: *Clase en vivo* (con la cámara), *Analizar imagen*, *Estadísticas* e *Historial*. Así todo el sistema se puede usar desde el contenedor.
 
 **Requisitos:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) en Windows o Mac (en Windows necesita WSL 2) o Docker Engine en Linux. La primera construcción descarga PyTorch y el modelo (unos 700 MB) y tarda varios minutos; la imagen ocupa alrededor de 2,4 GB. Las siguientes construcciones usan la caché y tardan segundos.
 
@@ -168,15 +168,22 @@ docker ps                    # en STATUS debe aparecer (healthy)
 | `EMOTI_PRECARGAR=1` | El modelo se carga al arrancar y el primer análisis no tiene que esperar. |
 | `HEALTHCHECK` contra `/salud` | Docker sabe si la API responde. |
 | `gunicorn` con 1 proceso y 4 hilos | Servidor de producción; el modelo se carga una sola vez en memoria. |
+| `opencv-python-headless` | OpenCV sin interfaz gráfica: detecta los rostros de la cámara dentro del contenedor sin necesitar pantalla. |
 
 **Opciones**
 
 - Modelo ajustado: descomprimir `modelo_emoticontigo.zip` en `modelos/` y descomentar `EMOTI_MODELO` en `docker-compose.yml`. La carpeta se monta en solo lectura.
 - Imagen más liviana: `docker build --build-arg DESCARGAR_MODELO=0 -t emoticontigo .` (el modelo se descarga al primer uso y necesita internet).
 
-### Por qué la app de escritorio no va en el contenedor
+### La cámara desde el contenedor
 
-La interfaz de escritorio y la cámara necesitan la pantalla y la cámara USB de la PC. En Windows y Mac, Docker Desktop no puede pasar una cámara USB al contenedor ni mostrar ventanas sin instalar aparte un servidor gráfico. Por eso el contenedor lleva la parte portable (API, modelo, base de datos y página web), y la app de escritorio se ejecuta directamente en la PC del aula.
+En Windows y Mac, Docker Desktop no puede pasar una cámara USB al contenedor ni mostrar ventanas de escritorio. Por eso la cámara la abre el **navegador**: la pestaña *Clase en vivo* toma un cuadro cada 5, 10 o 30 segundos (o al pulsar *Capturar ahora*) y lo envía a `POST /analizar-cuadro`. Dentro del contenedor, OpenCV ubica los rostros, el modelo clasifica cada uno y la respuesta vuelve con los recuadros, que la página dibuja sobre el video. El cuadro no se guarda: solo la lectura y sus detecciones, en la sesión abierta.
+
+- El navegador pide permiso para usar la cámara la primera vez.
+- Solo funciona en `http://localhost:5000` o con HTTPS: es una regla de seguridad de los navegadores.
+- Para empezar a usar la cámara hay que iniciar una sesión de clase (si no, la API responde `409`).
+
+La app de escritorio (`python -m src.interfaz`) sigue disponible para usar el sistema sin Docker.
 
 ## Instalación local
 
@@ -244,6 +251,9 @@ flake8 src tests --max-line-length=120              # estilo
 | `GET /estadisticas?sesion_id=3` | Total de análisis, conteo por emoción y confianza promedio. Sin `sesion_id`, de todas las sesiones. |
 | `GET /historial?limite=50&sesion_id=3` | Últimas detecciones (límite entre 1 y 100; `sesion_id` opcional) |
 | `GET /sesiones` | Sesiones de clase con su cantidad de lecturas y detecciones |
+| `POST /sesiones` | Abre una sesión de clase. JSON: `curso`, `grado_seccion` y `docente` (opcional). Cierra la que estuviera abierta. |
+| `POST /sesiones/<id>/cerrar` | Cierra la sesión (`404` si no existe, `409` si ya estaba cerrada) |
+| `POST /analizar-cuadro` | Recibe un cuadro de la cámara en el campo `imagen`, detecta y clasifica todos los rostros y devuelve sus recuadros, la emoción predominante y la distribución del grupo. Necesita una sesión abierta (`409` si no hay). |
 
 Ejemplo:
 
@@ -361,7 +371,7 @@ Grupo_Windows_R/
 │   ├── alcance.py         # reglas del alcance ético
 │   ├── preprocess.py      # validación y etiquetas
 │   ├── constantes.py      # límites y valores fijos
-│   └── web/index.html     # página de demostración (Docker)
+│   └── web/index.html     # página web con las 4 pestañas (Docker)
 ├── tests/                 # pruebas unitarias y de integración
 ├── db/                    # esquema y consultas SQL
 ├── notebooks/             # ajuste fino del modelo (Colab)

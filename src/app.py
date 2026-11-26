@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+import numpy as np
 from flask import Flask, jsonify, request, send_from_directory
 from PIL import Image, UnidentifiedImageError
 
@@ -9,10 +10,11 @@ from src.constantes import (
     LIMITE_HISTORIAL_DEFECTO, LIMITE_HISTORIAL_MAX, LIMITE_HISTORIAL_MIN,
     TAMANO_MAXIMO_BYTES, TAMANO_MAXIMO_MB,
 )
+from src.camara import AnalizadorAula, DetectorRostros, guardar_resultado_cuadro
 from src.historial import (
     RUTA_POR_DEFECTO,
-    guardar_analisis, inicializar_bd, listar_historial, listar_sesiones, obtener_estadisticas,
-    obtener_sesion, sesion_activa,
+    cerrar_sesion, guardar_analisis, iniciar_sesion, inicializar_bd, listar_historial, listar_sesiones,
+    obtener_estadisticas, obtener_sesion, sesion_activa,
 )
 from src.model import DetectorEmociones
 from src.preprocess import validar_extension
@@ -20,7 +22,9 @@ from src import alcance
 
 CAMPO_IMAGEN = "imagen"
 HTTP_SOLICITUD_INVALIDA = 400
+HTTP_CREADO = 201
 HTTP_NO_ENCONTRADO = 404
+HTTP_CONFLICTO = 409
 HTTP_ENTIDAD_DEMASIADO_GRANDE = 413
 MENSAJE_IMAGEN_INVALIDA = "El archivo no es una imagen válida"
 CARPETA_WEB = Path(__file__).resolve().parent / "web"
@@ -63,7 +67,19 @@ def leer_sesion_id(argumentos, ruta_bd):
     return sesion_id
 
 
-def crear_app(detector=None, ruta_bd=None):
+def a_bgr(imagen):
+    """Convierte una imagen RGB de Pillow al formato BGR que usa OpenCV."""
+    return np.ascontiguousarray(np.asarray(imagen)[:, :, ::-1])
+
+
+def leer_datos_sesion(cuerpo):
+    """Extrae curso, grado y sección, y docente de un JSON; ValueError si no es un objeto."""
+    if not isinstance(cuerpo, dict):
+        raise ValueError("Envía los datos de la sesión en formato JSON")
+    return cuerpo.get("curso"), cuerpo.get("grado_seccion"), cuerpo.get("docente")
+
+
+def crear_app(detector=None, ruta_bd=None, detector_rostros=None):
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = TAMANO_MAXIMO_BYTES
     app.config["RUTA_BD"] = ruta_bd or os.getenv("EMOTI_BD") or RUTA_POR_DEFECTO
@@ -74,6 +90,13 @@ def crear_app(detector=None, ruta_bd=None):
 
     inicializar_bd(app.config["RUTA_BD"])
     detector = detector or DetectorEmociones()
+    analizador = {}
+
+    def analizador_aula():
+        """El clasificador de rostros de OpenCV se carga la primera vez que se usa."""
+        if "aula" not in analizador:
+            analizador["aula"] = AnalizadorAula(detector, detector_rostros or DetectorRostros())
+        return analizador["aula"]
     if os.getenv(VARIABLE_PRECARGA) == "1" and hasattr(detector, "cargar"):
         # En Docker el modelo se carga al arrancar: la primera foto no espera
         detector.cargar()
@@ -128,6 +151,51 @@ def crear_app(detector=None, ruta_bd=None):
     @app.get("/sesiones")
     def sesiones():
         return jsonify(listar_sesiones(app.config["RUTA_BD"]))
+
+    @app.post("/sesiones")
+    def abrir_sesion():
+        """Abre una sesión de clase (cierra la que estuviera abierta)."""
+        try:
+            curso, grado, docente = leer_datos_sesion(request.get_json(silent=True))
+            sesion_id = iniciar_sesion(curso, grado, docente, app.config["RUTA_BD"])
+        except ValueError as error:
+            return jsonify({"error": str(error)}), HTTP_SOLICITUD_INVALIDA
+        return jsonify(obtener_sesion(sesion_id, app.config["RUTA_BD"])), HTTP_CREADO
+
+    @app.post("/sesiones/<int:sesion_id>/cerrar")
+    def terminar_sesion(sesion_id):
+        ruta = app.config["RUTA_BD"]
+        if obtener_sesion(sesion_id, ruta) is None:
+            return jsonify({"error": f"No existe la sesión {sesion_id}"}), HTTP_NO_ENCONTRADO
+        if not cerrar_sesion(sesion_id, ruta):
+            return jsonify({"error": f"La sesión {sesion_id} ya estaba cerrada"}), HTTP_CONFLICTO
+        return jsonify(obtener_sesion(sesion_id, ruta))
+
+    @app.post("/analizar-cuadro")
+    def analizar_cuadro():
+        """Analiza un cuadro de la cámara del navegador: todos sus rostros y el resumen del grupo."""
+        activa = sesion_activa(app.config["RUTA_BD"])
+        if activa is None:
+            mensaje = "Inicia una sesión de clase para usar la cámara"
+            return jsonify({"error": mensaje}), HTTP_CONFLICTO
+        try:
+            imagen = abrir_imagen(validar_archivo(request.files))
+        except ValueError as error:
+            return jsonify({"error": str(error)}), HTTP_SOLICITUD_INVALIDA
+        resultado = analizador_aula().analizar_cuadro(a_bgr(imagen))
+
+        violaciones_resp = alcance.validar_respuesta(str(resultado))
+        if violaciones_resp:
+            return jsonify({"error": "Respuesta fuera de alcance", "detalle": violaciones_resp}), 500
+
+        guardar_resultado_cuadro(resultado, app.config["RUTA_BD"], sesion_id=activa["id"])
+        return jsonify({
+            **resultado,
+            "rostros": [{**rostro, "caja": list(rostro["caja"])} for rostro in resultado["rostros"]],
+            "ancho": imagen.width,
+            "alto": imagen.height,
+            "sesion_id": activa["id"],
+        })
 
     @app.get("/historial")
     def historial():
