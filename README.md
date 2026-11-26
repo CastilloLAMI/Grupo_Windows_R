@@ -103,7 +103,7 @@ El contenedor ejecuta la **API Flask con el modelo de IA** y una **página web d
 
 ### Requisitos
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows o Mac) o Docker Engine (Linux).
-- La primera construcción descarga PyTorch y el modelo (unos 600 MB; la imagen final ocupa alrededor de 1,5 GB) y tarda varios minutos. Las siguientes reutilizan la caché.
+- La primera construcción descarga PyTorch y el modelo (unos 700 MB; la imagen ocupa alrededor de 2,4 GB en disco) y tarda varios minutos. Las siguientes reutilizan la caché.
 
 ### Con Docker Compose (recomendado)
 ```bash
