@@ -18,6 +18,7 @@ Proyecto final de Construcción de Software, Universidad Continental. Equipo **W
 - [Instalación local](#instalación-local)
 - [Pruebas y calidad](#pruebas-y-calidad)
 - [API](#api)
+- [Notificaciones por Telegram](#notificaciones-por-telegram)
 - [Base de datos](#base-de-datos)
 - [Alcance ético](#alcance-ético)
 - [Estructura del repositorio](#estructura-del-repositorio)
@@ -62,6 +63,8 @@ La aplicación de escritorio (`python -m src.interfaz`) tiene cuatro pestañas:
 | Historial | Las últimas 100 detecciones con filtros por sesión y emoción. Se puede exportar a CSV. |
 
 La cámara se lee y se analiza en un hilo aparte (`MonitorCamara` en `src/camara.py`), así la ventana no se congela mientras el modelo trabaja.
+
+Si hay credenciales de Telegram, la aplicación avisa al docente cuando se detecta tristeza, miedo o enfado (ver [Notificaciones por Telegram](#notificaciones-por-telegram)).
 
 **Validaciones y manejo de errores**
 
@@ -216,6 +219,8 @@ La primera vez que se usa el modelo, se descarga de Hugging Face (necesita inter
 | `EMOTI_BD` | Ruta del archivo SQLite | `emoticontigo.db` |
 | `EMOTI_MODELO` | Carpeta del modelo ajustado (con `config.json` y `model.safetensors`) | modelo de Hugging Face |
 | `EMOTI_PRECARGAR` | `1` carga el modelo al iniciar la API | sin precarga |
+| `EMOTI_TELEGRAM_TOKEN` | Token del bot de Telegram para los avisos | sin avisos |
+| `EMOTI_TELEGRAM_CHAT` | `chat_id` que recibe los avisos | sin avisos |
 
 ## Pruebas y calidad
 
@@ -245,6 +250,28 @@ Ejemplo:
 ```bash
 curl -F "imagen=@rostro.jpg" http://localhost:5000/predecir
 ```
+
+## Notificaciones por Telegram
+
+EmotiContigo puede avisar por Telegram cuando detecta tristeza, miedo o
+enfado con una confianza de 70 % o más. Se envía un solo mensaje por lectura
+(el rostro con mayor confianza). El aviso es solo una observación de apoyo
+para el docente y no incluye imágenes ni datos que identifiquen al estudiante.
+
+1. Abre Telegram, busca **@BotFather** y escribe `/newbot`. Guarda el token.
+2. Escríbele un mensaje cualquiera a tu bot nuevo.
+3. Abre en el navegador `https://api.telegram.org/bot<TU_TOKEN>/getUpdates`
+   y copia el número que aparece en `"chat":{"id":`. Ese es tu `chat_id`.
+4. Define las variables antes de ejecutar la app:
+
+   ```powershell
+   $env:EMOTI_TELEGRAM_TOKEN="tu_token"
+   $env:EMOTI_TELEGRAM_CHAT="tu_chat_id"
+   python -m src.interfaz
+   ```
+
+Si las variables no están definidas, la app funciona con normalidad y no envía
+avisos. Nunca subas el token ni el `chat_id` al repositorio.
 
 ## Base de datos
 
@@ -330,6 +357,7 @@ Grupo_Windows_R/
 │   ├── model.py           # DetectorEmociones (modelo de Hugging Face)
 │   ├── app.py             # API Flask
 │   ├── historial.py       # acceso a SQLite
+│   ├── notificaciones.py  # avisos por Telegram
 │   ├── alcance.py         # reglas del alcance ético
 │   ├── preprocess.py      # validación y etiquetas
 │   ├── constantes.py      # límites y valores fijos
