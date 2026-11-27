@@ -162,6 +162,21 @@ def resumen_grupo(rostros):
     return {"predominante": predominante, "distribucion": distribucion}
 
 
+def unir_camaras(resultados):
+    """Une las lecturas de varias cámaras del aula en una sola.
+
+    Cada rostro conserva el número de cámara (0, 1, ...) para dibujar su
+    recuadro en el video correcto; el resumen del grupo se calcula con los
+    rostros de todas las cámaras juntas.
+    """
+    rostros = [
+        {**rostro, "camara": numero}
+        for numero, resultado in enumerate(resultados)
+        for rostro in resultado["rostros"]
+    ]
+    return {"total_rostros": len(rostros), "rostros": rostros, **resumen_grupo(rostros)}
+
+
 class AnalizadorAula:
     """Une la detección de rostros con el detector de emociones."""
 

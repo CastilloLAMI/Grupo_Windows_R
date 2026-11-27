@@ -306,6 +306,38 @@ def obtener_estadisticas(ruta=RUTA_POR_DEFECTO, sesion_id=None):
     }
 
 
+LECTURAS_EN_VIVO = 5
+
+
+def lecturas_recientes(sesion_id, ruta=RUTA_POR_DEFECTO, limite=LECTURAS_EN_VIVO):
+    """Últimas lecturas de una sesión con la distribución promedio de sus rostros.
+
+    Es lo que ve el docente desde otra PC en modo observador: solo números,
+    nunca imágenes. Una lectura sin rostros trae la distribución vacía.
+    """
+    promedios = ", ".join(f"AVG(d.{emocion}) AS {emocion}" for emocion in EMOCIONES)
+    with conexion_bd(ruta) as conexion:
+        filas = conexion.execute(
+            f"SELECT l.id, l.fecha, l.fuente, l.total_rostros, l.predominante, {promedios} "
+            "FROM lectura l LEFT JOIN deteccion d ON d.lectura_id = l.id "
+            "WHERE l.sesion_id = ? GROUP BY l.id ORDER BY l.id DESC LIMIT ?",
+            (sesion_id, limite),
+        ).fetchall()
+    return [
+        {
+            "id": fila["id"],
+            "fecha": fila["fecha"],
+            "fuente": fila["fuente"],
+            "total_rostros": fila["total_rostros"],
+            "predominante": fila["predominante"],
+            "distribucion": {
+                emocion: round(fila[emocion], DECIMALES) for emocion in EMOCIONES
+            } if fila["total_rostros"] else {},
+        }
+        for fila in filas
+    ]
+
+
 # ---------- Exportación ----------
 
 COLUMNAS_CSV = ("id", "fecha", "emocion", "confianza")

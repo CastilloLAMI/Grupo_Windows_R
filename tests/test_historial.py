@@ -9,7 +9,7 @@ from src import alcance
 from src.historial import (
     CURSO_ANTERIOR, FUENTE_ANTERIOR, FUENTE_CAMARA, FUENTE_IMAGEN, RUTA_ESQUEMA, TABLA_RESPALDO,
     VERSION_ESQUEMA, cerrar_sesion, conexion_bd, exportar_csv, guardar_analisis, guardar_lectura,
-    iniciar_sesion, inicializar_bd, listar_historial, listar_sesiones, obtener_estadisticas,
+    iniciar_sesion, inicializar_bd, lecturas_recientes, listar_historial, listar_sesiones, obtener_estadisticas,
     obtener_sesion, sesion_activa, version_esquema,
 )
 from src.preprocess import EMOCIONES
@@ -338,6 +338,38 @@ class TestExportarCsv(BaseBD):
         self.assertEqual(exportar_csv([], ruta_csv), 0)
         with open(ruta_csv, newline="", encoding="utf-8-sig") as archivo:
             self.assertEqual(len(list(csv.reader(archivo))), 1)
+
+
+class TestLecturasRecientes(BaseBD):
+    """Lo que ve el docente desde otra PC: las últimas lecturas de la sesión, sin imágenes."""
+
+    def test_de_la_mas_reciente_a_la_mas_antigua(self):
+        sesion_id = iniciar_sesion("Matemática", "5.º A", ruta=self.ruta)
+        guardar_lectura(cuadro(rostro("tristeza", 70.0)), FUENTE_CAMARA, sesion_id, self.ruta)
+        guardar_lectura(cuadro(rostro("felicidad", 80.0), rostro("felicidad", 60.0)),
+                        FUENTE_CAMARA, sesion_id, self.ruta)
+        lecturas = lecturas_recientes(sesion_id, self.ruta)
+        self.assertEqual([lectura["predominante"] for lectura in lecturas], ["felicidad", "tristeza"])
+        self.assertEqual(lecturas[0]["total_rostros"], 2)
+        self.assertEqual(lecturas[0]["distribucion"]["felicidad"], 70.0)
+        self.assertEqual(set(lecturas[0]["distribucion"]), set(EMOCIONES))
+        self.assertNotIn("imagen", lecturas[0])
+
+    def test_solo_de_esa_sesion_y_con_limite(self):
+        otra = iniciar_sesion("Arte", "6.º B", ruta=self.ruta)
+        guardar_lectura(cuadro(rostro("miedo", 70.0)), FUENTE_CAMARA, otra, self.ruta)
+        sesion_id = iniciar_sesion("Matemática", "5.º A", ruta=self.ruta)
+        for _ in range(3):
+            guardar_lectura(cuadro(rostro("neutral", 70.0)), FUENTE_CAMARA, sesion_id, self.ruta)
+        self.assertEqual(len(lecturas_recientes(sesion_id, self.ruta, limite=2)), 2)
+        recientes = lecturas_recientes(sesion_id, self.ruta)
+        self.assertTrue(all(lectura["predominante"] == "neutral" for lectura in recientes))
+
+    def test_lectura_sin_rostros(self):
+        sesion_id = iniciar_sesion("Matemática", "5.º A", ruta=self.ruta)
+        guardar_lectura(cuadro(), FUENTE_CAMARA, sesion_id, self.ruta)
+        lectura = lecturas_recientes(sesion_id, self.ruta)[0]
+        self.assertEqual((lectura["total_rostros"], lectura["distribucion"]), (0, {}))
 
 
 if __name__ == "__main__":

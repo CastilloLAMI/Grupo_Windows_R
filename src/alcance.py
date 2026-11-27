@@ -36,6 +36,7 @@ ENDPOINTS_PERMITIDOS = (
     "/historial",
     "/sesiones",
     "/analizar-cuadro",
+    "/en-vivo",
 )
 
 # ============================================================

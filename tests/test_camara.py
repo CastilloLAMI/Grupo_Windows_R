@@ -9,7 +9,7 @@ from PIL import Image
 from src.camara import (
     INTERVALO_ANALISIS_S, AnalizadorAula, Camara, DetectorRostros, ErrorCamara, MonitorCamara,
     color_emocion_bgr, COLOR_DEFECTO_BGR, dibujar_resultados, guardar_resultado_cuadro,
-    recortar_rostro, resumen_grupo, toca_analizar,
+    recortar_rostro, resumen_grupo, toca_analizar, unir_camaras,
 )
 from src.historial import iniciar_sesion, inicializar_bd, listar_historial, obtener_estadisticas
 from src.preprocess import EMOCIONES
@@ -176,6 +176,26 @@ class TestResumenGrupo(unittest.TestCase):
         self.assertEqual(resumen["distribucion"]["felicidad"], 60.0)
         self.assertEqual(resumen["distribucion"]["neutral"], 40.0)
         self.assertEqual(set(resumen["distribucion"]), set(EMOCIONES))
+
+
+class TestUnirCamaras(unittest.TestCase):
+    """Dos cámaras del aula se guardan como una sola lectura."""
+
+    def test_suma_los_rostros_y_marca_la_camara(self):
+        camara_1 = {"rostros": [{"caja": (0, 0, 9, 9), "todas": distribucion(felicidad=80.0, neutral=20.0)}]}
+        camara_2 = {"rostros": [
+            {"caja": (1, 1, 9, 9), "todas": distribucion(felicidad=20.0, neutral=80.0)},
+            {"caja": (2, 2, 9, 9), "todas": distribucion(felicidad=10.0, neutral=90.0)},
+        ]}
+        unido = unir_camaras([camara_1, camara_2])
+        self.assertEqual(unido["total_rostros"], 3)
+        self.assertEqual([r["camara"] for r in unido["rostros"]], [0, 1, 1])
+        self.assertEqual(unido["predominante"], "neutral")
+        self.assertAlmostEqual(unido["distribucion"]["neutral"], 63.33)
+
+    def test_una_camara_sin_rostros(self):
+        unido = unir_camaras([{"rostros": []}])
+        self.assertEqual(unido, {"total_rostros": 0, "rostros": [], "predominante": None, "distribucion": {}})
 
 
 class TestAnalizadorAula(unittest.TestCase):

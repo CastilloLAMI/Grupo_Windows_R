@@ -50,6 +50,7 @@ class TestApi(unittest.TestCase):
         self.assertIn("/", rutas)
         self.assertIn("/analizar-cuadro", rutas)
         self.assertIn("/sesiones/<int:sesion_id>/cerrar", rutas)
+        self.assertIn("/en-vivo", rutas)
 
     def test_predecir_ok(self):
         respuesta = self.cliente.post("/predecir", data=imagen_png())
@@ -266,6 +267,41 @@ class TestSesionesYCamaraWeb(unittest.TestCase):
         malo = {"imagen": (io.BytesIO(b"no soy una imagen"), "cuadro.jpg")}
         respuesta = self.cliente.post("/analizar-cuadro", data=malo)
         self.assertEqual(respuesta.status_code, 400)
+
+    def test_dos_camaras_son_una_sola_lectura(self):
+        sesion_id = self.abrir().get_json()["id"]
+        camara_1, camara_2 = cuadro_jpg(320, 240)["imagen"], cuadro_jpg(640, 480)["imagen"]
+        respuesta = self.cliente.post("/analizar-cuadro", data={"imagen": [camara_1, camara_2]})
+        self.assertEqual(respuesta.status_code, 200)
+        datos = respuesta.get_json()
+        self.assertEqual(datos["total_rostros"], 4)
+        self.assertEqual([r["camara"] for r in datos["rostros"]], [0, 0, 1, 1])
+        self.assertEqual(
+            datos["cuadros"],
+            [{"camara": 0, "ancho": 320, "alto": 240, "total_rostros": 2},
+             {"camara": 1, "ancho": 640, "alto": 480, "total_rostros": 2}],
+        )
+        estadisticas = self.cliente.get(f"/estadisticas?sesion_id={sesion_id}").get_json()
+        self.assertEqual((estadisticas["lecturas"], estadisticas["total"]), (1, 4))
+
+    def test_mas_de_dos_camaras(self):
+        self.abrir()
+        tres = [cuadro_jpg()["imagen"] for _ in range(3)]
+        respuesta = self.cliente.post("/analizar-cuadro", data={"imagen": tres})
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("hasta 2", respuesta.get_json()["error"])
+
+    def test_en_vivo_sin_sesion(self):
+        self.assertEqual(self.cliente.get("/en-vivo").get_json(), {"sesion": None, "lecturas": []})
+
+    def test_en_vivo_muestra_la_ultima_lectura(self):
+        sesion_id = self.abrir().get_json()["id"]
+        self.cliente.post("/analizar-cuadro", data=cuadro_jpg())
+        datos = self.cliente.get("/en-vivo").get_json()
+        self.assertEqual(datos["sesion"]["id"], sesion_id)
+        self.assertEqual(len(datos["lecturas"]), 1)
+        self.assertEqual(datos["lecturas"][0]["total_rostros"], 2)
+        self.assertEqual(datos["lecturas"][0]["predominante"], "felicidad")
 
     def test_a_bgr_invierte_los_canales(self):
         bgr = a_bgr(Image.new("RGB", (2, 2), (255, 0, 0)))
