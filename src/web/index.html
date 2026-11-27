@@ -244,7 +244,8 @@
   const COLORES = { enfado: "#D64545", asco: "#6E8B2E", miedo: "#7B5EA7", felicidad: "#E0A100",
                     tristeza: "#3B7DD8", sorpresa: "#E07B39", neutral: "#7D8F87" };
   const FUENTES = { camara: "Cámara", imagen: "Imagen", anterior: "Historial anterior" };
-  const ANCHO_CUADRO = 640;
+  // Cuadros de hasta 1280 px: los rostros del fondo del aula siguen teniendo suficientes píxeles
+  const ANCHO_CUADRO = 1280;
   const ULTIMAS_LECTURAS = 5;
   const $ = (id) => document.getElementById(id);
   const nombre = (e) => e ? e.charAt(0).toUpperCase() + e.slice(1) : "—";
@@ -437,7 +438,11 @@
     }
   });
 
-  const abrirFlujo = (id) => navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : true, audio: false });
+  // Se pide 1280x720 (ideal): si la cámara no llega, el navegador usa la mejor que tenga
+  const abrirFlujo = (id) => navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, ...(id ? { deviceId: { exact: id } } : {}) },
+    audio: false,
+  });
   const idDe = (flujo) => flujo.getVideoTracks()[0]?.getSettings().deviceId;
 
   async function iniciarCamara() {

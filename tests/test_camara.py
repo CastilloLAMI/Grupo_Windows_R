@@ -37,6 +37,10 @@ class CapturaFalsa:
     def isOpened(self):
         return self.abre and not self.liberada
 
+    def set(self, propiedad, valor):
+        self.propiedades = {**getattr(self, "propiedades", {}), propiedad: valor}
+        return True
+
     def read(self):
         if not self.cuadros:
             return False, None
@@ -77,6 +81,12 @@ class TestCamara(unittest.TestCase):
             self.assertEqual(camara.leer().shape, (ALTO, ANCHO, 3))
         self.assertTrue(captura.liberada)
         self.assertFalse(camara.abierta)
+
+    def test_pide_alta_resolucion(self):
+        captura = CapturaFalsa(cuadros=[cuadro_falso()])
+        Camara(fabrica=lambda indice: captura).abrir()
+        # Ancho y alto pedidos a OpenCV (CAP_PROP_FRAME_WIDTH y CAP_PROP_FRAME_HEIGHT)
+        self.assertEqual(sorted(captura.propiedades.values()), [720, 1280])
 
     def test_pasa_el_indice_a_la_fabrica(self):
         indices = []
@@ -130,6 +140,12 @@ class TestDetectorRostros(unittest.TestCase):
         DetectorRostros(cascada).detectar(cuadro_falso())
         self.assertEqual(cascada.gris.shape, (ALTO, ANCHO))
         self.assertIn("minSize", cascada.argumentos)
+
+    def test_capta_rostros_pequenos_del_fondo_del_aula(self):
+        # El modelo se entrenó con rostros de 48x48: el mínimo no debe ser mayor
+        cascada = CascadaFalsa([])
+        DetectorRostros(cascada).detectar(cuadro_falso())
+        self.assertLessEqual(cascada.argumentos["minSize"], (48, 48))
 
     def test_sin_rostros(self):
         self.assertEqual(DetectorRostros(CascadaFalsa(())).detectar(cuadro_falso()), [])
