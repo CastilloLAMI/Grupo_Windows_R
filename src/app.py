@@ -10,10 +10,11 @@ from src.constantes import (
     LIMITE_HISTORIAL_DEFECTO, LIMITE_HISTORIAL_MAX, LIMITE_HISTORIAL_MIN,
     TAMANO_MAXIMO_BYTES, TAMANO_MAXIMO_MB,
 )
-from src.camara import AnalizadorAula, DetectorRostros, guardar_resultado_cuadro
+from src.camara import AnalizadorAula, DetectorRostros, guardar_resultado_cuadro, unir_camaras
 from src.historial import (
     RUTA_POR_DEFECTO,
-    cerrar_sesion, guardar_analisis, iniciar_sesion, inicializar_bd, listar_historial, listar_sesiones,
+    cerrar_sesion, guardar_analisis, iniciar_sesion, inicializar_bd, lecturas_recientes, listar_historial,
+    listar_sesiones,
     obtener_estadisticas, obtener_sesion, sesion_activa,
 )
 from src.model import DetectorEmociones
@@ -21,6 +22,7 @@ from src.preprocess import validar_extension
 from src import alcance
 
 CAMPO_IMAGEN = "imagen"
+MAX_CAMARAS = 2
 HTTP_SOLICITUD_INVALIDA = 400
 HTTP_CREADO = 201
 HTTP_NO_ENCONTRADO = 404
@@ -41,6 +43,20 @@ def validar_archivo(archivos):
         raise ValueError("No se seleccionó ningún archivo")
     validar_extension(archivo.filename)
     return archivo
+
+
+def validar_cuadros(archivos):
+    """Devuelve los cuadros de la cámara (1 o 2, uno por cámara) o lanza ValueError."""
+    cuadros = archivos.getlist(CAMPO_IMAGEN)
+    if not cuadros:
+        raise ValueError(f"Falta el archivo '{CAMPO_IMAGEN}'")
+    if len(cuadros) > MAX_CAMARAS:
+        raise ValueError(f"Se aceptan hasta {MAX_CAMARAS} cámaras por lectura")
+    for cuadro in cuadros:
+        if cuadro.filename == "":
+            raise ValueError("No se seleccionó ningún archivo")
+        validar_extension(cuadro.filename)
+    return cuadros
 
 
 def abrir_imagen(archivo):
@@ -173,16 +189,17 @@ def crear_app(detector=None, ruta_bd=None, detector_rostros=None):
 
     @app.post("/analizar-cuadro")
     def analizar_cuadro():
-        """Analiza un cuadro de la cámara del navegador: todos sus rostros y el resumen del grupo."""
+        """Analiza los cuadros de 1 o 2 cámaras del navegador como una sola lectura del aula."""
         activa = sesion_activa(app.config["RUTA_BD"])
         if activa is None:
             mensaje = "Inicia una sesión de clase para usar la cámara"
             return jsonify({"error": mensaje}), HTTP_CONFLICTO
         try:
-            imagen = abrir_imagen(validar_archivo(request.files))
+            imagenes = [abrir_imagen(cuadro) for cuadro in validar_cuadros(request.files)]
         except ValueError as error:
             return jsonify({"error": str(error)}), HTTP_SOLICITUD_INVALIDA
-        resultado = analizador_aula().analizar_cuadro(a_bgr(imagen))
+        por_camara = [analizador_aula().analizar_cuadro(a_bgr(imagen)) for imagen in imagenes]
+        resultado = unir_camaras(por_camara)
 
         violaciones_resp = alcance.validar_respuesta(str(resultado))
         if violaciones_resp:
@@ -192,10 +209,23 @@ def crear_app(detector=None, ruta_bd=None, detector_rostros=None):
         return jsonify({
             **resultado,
             "rostros": [{**rostro, "caja": list(rostro["caja"])} for rostro in resultado["rostros"]],
-            "ancho": imagen.width,
-            "alto": imagen.height,
+            "cuadros": [
+                {"camara": numero, "ancho": imagen.width, "alto": imagen.height,
+                 "total_rostros": lectura["total_rostros"]}
+                for numero, (imagen, lectura) in enumerate(zip(imagenes, por_camara))
+            ],
+            "ancho": imagenes[0].width,
+            "alto": imagenes[0].height,
             "sesion_id": activa["id"],
         })
+
+    @app.get("/en-vivo")
+    def en_vivo():
+        """Sesión en curso y sus últimas lecturas, para seguir la clase desde otra PC."""
+        activa = sesion_activa(app.config["RUTA_BD"])
+        if activa is None:
+            return jsonify({"sesion": None, "lecturas": []})
+        return jsonify({"sesion": activa, "lecturas": lecturas_recientes(activa["id"], app.config["RUTA_BD"])})
 
     @app.get("/historial")
     def historial():

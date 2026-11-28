@@ -1,7 +1,8 @@
 # EmotiContigo con Docker Compose
 #
 #   docker compose up --build      -> construye la imagen y levanta el servicio
-#   http://localhost:5000          -> página de demostración
+#   http://localhost:5000          -> página web (cámaras en la PC del aula)
+#   http://IP-de-la-PC:5000        -> el docente desde otra PC de la red (modo observador)
 #   docker compose down            -> detiene el servicio (los datos se conservan)
 services:
   emoticontigo:

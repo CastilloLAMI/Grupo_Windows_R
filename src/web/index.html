@@ -32,7 +32,7 @@
   h2 { margin: 0; font-size: 17px; }
   .etiqueta { font-size: 11px; font-weight: 700; letter-spacing: .8px; color: var(--seccion); text-transform: uppercase; }
   .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
-  .fila[hidden] { display: none; }
+  .fila[hidden], button[hidden] { display: none; }
   .entre { justify-content: space-between; align-items: center; }
   button, .boton { font: inherit; font-weight: 700; font-size: 13px; min-height: 42px; padding: 0 18px; border-radius: 10px; border: none; background: var(--boton); color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   button:hover:not(:disabled), .boton:hover { background: var(--boton-hover); color: #fff; }
@@ -48,7 +48,11 @@
   .estado-camara.vivo { background: var(--boton); color: #fff; }
   .lienzo { position: relative; background: var(--video); border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; color: #A9BDB3; text-align: center; padding: 16px; }
   .lienzo video, .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-  .lienzo video[hidden] { display: none; }
+  .lienzo video[hidden], .lienzo[hidden] { display: none; }
+  .camaras { display: grid; gap: 10px; }
+  .camaras.dos { grid-template-columns: 1fr 1fr; }
+  .camaras.dos .lienzo { font-size: 12px; }
+  .nombre-camara { position: absolute; left: 8px; bottom: 8px; z-index: 2; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
   .vista { background: var(--vista); border: 2px dashed #A9BDB3; border-radius: 12px; min-height: 240px; display: flex; align-items: center; justify-content: center; color: var(--suave); text-align: center; overflow: hidden; }
   .vista img { max-width: 100%; max-height: 320px; display: block; }
   .tarjeta { background: var(--vista); border-radius: 12px; padding: 14px 16px; }
@@ -80,6 +84,7 @@
     <p>Apoyo al docente para observar expresiones faciales</p>
   </div>
   <div class="pildoras">
+    <span class="pildora" id="modo" hidden title="Esta PC solo ve el resumen; la cámara se maneja en la PC del aula">Modo observador</span>
     <span class="pildora" id="estado-sesion">Sin sesión activa</span>
     <span class="pildora" id="estado-servidor">Conectando con la API…</span>
   </div>
@@ -116,21 +121,31 @@
           <h2 id="titulo-camara">Cámara del aula</h2>
           <span class="estado-camara" id="estado-camara">Detenida</span>
         </div>
-        <div class="lienzo" id="lienzo">
-          <span id="aviso-camara">Inicia una sesión de clase para usar la cámara.</span>
-          <video id="video" autoplay playsinline muted hidden></video>
-          <canvas id="recuadros" aria-hidden="true"></canvas>
+        <div class="camaras" id="camaras">
+          <div class="lienzo" id="lienzo1">
+            <span id="aviso-camara">Inicia una sesión de clase para usar la cámara.</span>
+            <video id="video1" autoplay playsinline muted hidden></video>
+            <canvas id="recuadros1" aria-hidden="true"></canvas>
+            <span class="nombre-camara" id="nombre-camara1" hidden>Cámara 1</span>
+          </div>
+          <div class="lienzo" id="lienzo2" hidden>
+            <video id="video2" autoplay playsinline muted hidden></video>
+            <canvas id="recuadros2" aria-hidden="true"></canvas>
+            <span class="nombre-camara">Cámara 2</span>
+          </div>
         </div>
-        <div class="fila">
-          <label class="campo">Cámara <select id="camara"><option value="">Cámara predeterminada</option></select></label>
+        <div class="fila" id="controles-camara">
+          <label class="campo">Cámara 1 <select id="camara"><option value="">Cámara predeterminada</option></select></label>
+          <label class="campo">Cámara 2 <select id="camara2"><option value="">Sin segunda cámara</option></select></label>
           <label class="campo">Analizar cada
             <select id="intervalo"><option value="5">5 segundos</option><option value="10">10 segundos</option><option value="30">30 segundos</option></select>
           </label>
         </div>
-        <div class="fila">
+        <div class="fila" id="botones-camara">
           <button type="button" id="iniciar-camara" disabled>Iniciar cámara</button>
           <button type="button" class="secundario" id="detener-camara" disabled>Detener</button>
           <button type="button" class="secundario" id="capturar" disabled>Capturar ahora</button>
+          <button type="button" class="secundario" id="detectar-camaras" hidden>Detectar cámaras</button>
         </div>
         <p class="mensaje" id="mensaje-camara" role="status" aria-live="polite"></p>
       </section>
@@ -229,7 +244,8 @@
   const COLORES = { enfado: "#D64545", asco: "#6E8B2E", miedo: "#7B5EA7", felicidad: "#E0A100",
                     tristeza: "#3B7DD8", sorpresa: "#E07B39", neutral: "#7D8F87" };
   const FUENTES = { camara: "Cámara", imagen: "Imagen", anterior: "Historial anterior" };
-  const ANCHO_CUADRO = 640;
+  // Cuadros de hasta 1280 px: los rostros del fondo del aula siguen teniendo suficientes píxeles
+  const ANCHO_CUADRO = 1280;
   const ULTIMAS_LECTURAS = 5;
   const $ = (id) => document.getElementById(id);
   const nombre = (e) => e ? e.charAt(0).toUpperCase() + e.slice(1) : "—";
@@ -273,7 +289,11 @@
   async function pedir(url, opciones) {
     const respuesta = await fetch(url, opciones);
     const datos = await respuesta.json().catch(() => ({}));
-    if (!respuesta.ok) throw new Error(datos.error || `Error ${respuesta.status}`);
+    if (!respuesta.ok) {
+      const error = new Error(datos.error || `Error ${respuesta.status}`);
+      error.status = respuesta.status;
+      throw error;
+    }
     return datos;
   }
 
@@ -356,22 +376,36 @@
     }
   });
 
-  // ---------- Cámara del navegador ----------
-  let flujo = null;
+  // ---------- Cámaras del navegador (hasta 2 en la misma PC) ----------
+  // El navegador solo permite la cámara en http://localhost o con https. Desde otra PC
+  // (http://IP:5000) la página entra en modo observador: ve el resumen del grupo, sin video.
+  const OBSERVADOR = !window.isSecureContext || !navigator.mediaDevices?.getUserMedia;
+  const INTERVALO_EN_VIVO_MS = 5000;
+  const camaras = [
+    { video: $("video1"), lienzo: $("recuadros1"), marco: $("lienzo1"), flujo: null },
+    { video: $("video2"), lienzo: $("recuadros2"), marco: $("lienzo2"), flujo: null },
+  ];
   let temporizador = null;
   let analizando = false;
   let ultimoResultado = null;
   const lecturas = [];
-  const video = $("video");
-  const lienzo = $("recuadros");
+  const encendida = () => Boolean(camaras[0].flujo);
+  const activas = () => camaras.filter((c) => c.flujo);
 
   function actualizarBotonesCamara() {
-    const encendida = Boolean(flujo);
-    $("iniciar-camara").disabled = encendida || !activa;
-    $("detener-camara").disabled = !encendida;
-    $("capturar").disabled = !encendida;
-    $("camara").disabled = encendida;
-    if (!encendida) {
+    const on = encendida();
+    $("iniciar-camara").disabled = on || !activa || OBSERVADOR;
+    $("detener-camara").disabled = !on;
+    $("capturar").disabled = !on;
+    $("camara").disabled = on;
+    $("camara2").disabled = on;
+    if (OBSERVADOR) {
+      $("aviso-camara").textContent = activa
+        ? "Estás viendo la clase desde otra PC. Por privacidad no se transmite el video: solo el resumen del grupo, que se actualiza cada 5 segundos."
+        : "Esperando que se inicie una sesión de clase en la PC del aula…";
+      return;
+    }
+    if (!on) {
       $("aviso-camara").textContent = activa
         ? "La cámara está detenida. Presiona «Iniciar cámara» para empezar."
         : "Inicia una sesión de clase para usar la cámara.";
@@ -379,59 +413,100 @@
   }
 
   async function listarCamaras() {
-    if (!navigator.mediaDevices?.enumerateDevices) return;
+    if (OBSERVADOR || !navigator.mediaDevices?.enumerateDevices) return;
     const dispositivos = await navigator.mediaDevices.enumerateDevices();
-    const camaras = dispositivos.filter((d) => d.kind === "videoinput");
-    const elegida = $("camara").value;
-    const opciones = [new Option("Cámara predeterminada", "")];
-    camaras.forEach((c, i) => opciones.push(new Option(c.label || `Cámara ${i + 1}`, c.deviceId)));
-    $("camara").replaceChildren(...opciones);
-    $("camara").value = camaras.some((c) => c.deviceId === elegida) ? elegida : "";
+    const lista = dispositivos.filter((d) => d.kind === "videoinput");
+    [["camara", "Cámara predeterminada"], ["camara2", "Sin segunda cámara"]].forEach(([id, primera]) => {
+      const elegida = $(id).value;
+      const opciones = [new Option(primera, "")];
+      lista.forEach((c, i) => { if (c.deviceId) opciones.push(new Option(c.label || `Cámara ${i + 1}`, c.deviceId)); });
+      $(id).replaceChildren(...opciones);
+      $(id).value = lista.some((c) => c.deviceId === elegida) ? elegida : "";
+    });
+    // Sin permiso todavía, el navegador no da los nombres ni los ids de las cámaras
+    $("detectar-camaras").hidden = lista.some((c) => c.label);
   }
 
+  $("detectar-camaras").addEventListener("click", async () => {
+    try {
+      const prueba = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      prueba.getTracks().forEach((pista) => pista.stop());
+      await listarCamaras();
+      mensaje("mensaje-camara", "Cámaras detectadas: elige la cámara 1 y, si tienes otra, la cámara 2.");
+    } catch (error) {
+      mensaje("mensaje-camara", `No se pudieron detectar las cámaras (${error.name}). Revisa el permiso del navegador.`, true);
+    }
+  });
+
+  // Se pide 1280x720 (ideal): si la cámara no llega, el navegador usa la mejor que tenga
+  const abrirFlujo = (id) => navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, ...(id ? { deviceId: { exact: id } } : {}) },
+    audio: false,
+  });
+  const idDe = (flujo) => flujo.getVideoTracks()[0]?.getSettings().deviceId;
+
   async function iniciarCamara() {
-    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    if (OBSERVADOR) {
       mensaje("mensaje-camara", "El navegador solo permite la cámara en http://localhost o con https.", true);
       return;
     }
-    const id = $("camara").value;
+    const id2 = $("camara2").value;
+    let numero = 1;
     try {
-      flujo = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : true, audio: false });
+      camaras[0].flujo = await abrirFlujo($("camara").value);
+      if (id2) {
+        numero = 2;
+        if (idDe(camaras[0].flujo) === id2) {
+          detenerCamara();
+          mensaje("mensaje-camara", "La cámara 1 y la cámara 2 son la misma: elige dos cámaras distintas.", true);
+          return;
+        }
+        camaras[1].flujo = await abrirFlujo(id2);
+      }
     } catch (error) {
-      mensaje("mensaje-camara", `No se pudo abrir la cámara (${error.name}). Revisa el permiso del navegador y que otra aplicación no la esté usando.`, true);
+      detenerCamara();
+      mensaje("mensaje-camara", `No se pudo abrir la cámara ${numero} (${error.name}). Revisa el permiso del navegador y que otra aplicación no la esté usando.`, true);
       return;
     }
-    video.srcObject = flujo;
-    video.hidden = false;
+    const dos = Boolean(camaras[1].flujo);
+    $("camaras").classList.toggle("dos", dos);
+    camaras[1].marco.hidden = !dos;
+    $("nombre-camara1").hidden = !dos;
+    activas().forEach((c) => { c.video.srcObject = c.flujo; c.video.hidden = false; });
     $("aviso-camara").textContent = "";
-    $("estado-camara").textContent = "En vivo";
+    $("estado-camara").textContent = dos ? "En vivo · 2 cámaras" : "En vivo";
     $("estado-camara").classList.add("vivo");
     ultimoResultado = null;
-    dibujarRecuadros();
     actualizarBotonesCamara();
     listarCamaras().catch(() => {});
-    mensaje("mensaje-camara", `Cámara activa: se analiza cada ${$("intervalo").value} s en el contenedor`);
-    await video.play().catch(() => {});
+    mensaje("mensaje-camara", `${dos ? "2 cámaras activas" : "Cámara activa"}: se analiza cada ${$("intervalo").value} s en el contenedor`);
+    await Promise.all(activas().map((c) => c.video.play().catch(() => {})));
+    dibujarRecuadros();
     programarAnalisis(true);
   }
 
   function detenerCamara() {
     clearTimeout(temporizador);
     temporizador = null;
-    if (flujo) flujo.getTracks().forEach((pista) => pista.stop());
-    flujo = null;
-    video.srcObject = null;
-    video.hidden = true;
+    camaras.forEach((c) => {
+      if (c.flujo) c.flujo.getTracks().forEach((pista) => pista.stop());
+      c.flujo = null;
+      c.video.srcObject = null;
+      c.video.hidden = true;
+    });
+    camaras[1].marco.hidden = true;
+    $("nombre-camara1").hidden = true;
+    $("camaras").classList.remove("dos");
     ultimoResultado = null;
     dibujarRecuadros();
-    $("estado-camara").textContent = "Detenida";
+    $("estado-camara").textContent = OBSERVADOR ? "Observador" : "Detenida";
     $("estado-camara").classList.remove("vivo");
     actualizarBotonesCamara();
   }
 
   function programarAnalisis(ahora) {
     clearTimeout(temporizador);
-    if (!flujo) return;
+    if (!encendida()) return;
     const espera = ahora ? 500 : Number($("intervalo").value) * 1000;
     temporizador = setTimeout(async () => {
       await analizarCuadro();
@@ -439,7 +514,7 @@
     }, espera);
   }
 
-  function cuadroActual() {
+  function cuadroActual(video) {
     const escala = Math.min(1, ANCHO_CUADRO / video.videoWidth);
     const lienzoCuadro = document.createElement("canvas");
     lienzoCuadro.width = Math.round(video.videoWidth * escala);
@@ -449,11 +524,14 @@
   }
 
   async function analizarCuadro() {
-    if (!flujo || analizando || !video.videoWidth) return;
+    if (!encendida() || analizando || activas().some((c) => !c.video.videoWidth)) return;
     analizando = true;
     try {
+      // Un cuadro por cámara en la misma petición: el contenedor lo guarda como una sola lectura del aula
       const formulario = new FormData();
-      formulario.append("imagen", await cuadroActual(), "cuadro.jpg");
+      for (const [i, c] of activas().entries()) {
+        formulario.append("imagen", await cuadroActual(c.video), `camara${i + 1}.jpg`);
+      }
       const resultado = await pedir("/analizar-cuadro", { method: "POST", body: formulario });
       ultimoResultado = resultado;
       dibujarRecuadros();
@@ -461,52 +539,107 @@
       mensaje("mensaje-camara", `Última lectura: ${hora()}`);
     } catch (error) {
       mensaje("mensaje-camara", error.message, true);
+      if (error.status === 409) {
+        // La sesión se cerró (por ejemplo, desde otra PC): se detiene la cámara
+        detenerCamara();
+        await cargarSesiones().catch(() => {});
+      }
     } finally {
       analizando = false;
     }
   }
 
   function dibujarRecuadros() {
-    const ancho = lienzo.clientWidth;
-    const alto = lienzo.clientHeight;
-    lienzo.width = ancho;
-    lienzo.height = alto;
-    const ctx = lienzo.getContext("2d");
-    ctx.clearRect(0, 0, ancho, alto);
-    if (!ultimoResultado || !flujo) return;
-    // El video se muestra con object-fit: contain; se calcula dónde quedó dentro del lienzo
-    const escala = Math.min(ancho / ultimoResultado.ancho, alto / ultimoResultado.alto);
-    const dx = (ancho - ultimoResultado.ancho * escala) / 2;
-    const dy = (alto - ultimoResultado.alto * escala) / 2;
-    ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
-    ctx.lineWidth = 3;
-    ultimoResultado.rostros.forEach((r) => {
-      const [x, y, w, h] = r.caja;
-      const color = COLORES[r.emocion] || "#1E7F5E";
-      const bx = dx + x * escala, by = dy + y * escala;
-      ctx.strokeStyle = color;
-      ctx.strokeRect(bx, by, w * escala, h * escala);
-      const texto = `${nombre(r.emocion)} ${Math.round(r.confianza)}%`;
-      const anchoTexto = ctx.measureText(texto).width + 12;
-      const ty = Math.max(0, by - 24);
-      ctx.fillStyle = color;
-      ctx.fillRect(bx - 1.5, ty, anchoTexto, 22);
-      ctx.fillStyle = "#141414";
-      ctx.fillText(texto, bx + 4.5, ty + 16);
+    camaras.forEach((c, numero) => {
+      const ancho = c.lienzo.clientWidth;
+      const alto = c.lienzo.clientHeight;
+      c.lienzo.width = ancho;
+      c.lienzo.height = alto;
+      const ctx = c.lienzo.getContext("2d");
+      ctx.clearRect(0, 0, ancho, alto);
+      if (!ultimoResultado || !c.flujo || !ancho) return;
+      const cuadro = ultimoResultado.cuadros?.[numero] || { ancho: ultimoResultado.ancho, alto: ultimoResultado.alto };
+      // El video se muestra con object-fit: contain; se calcula dónde quedó dentro del lienzo
+      const escala = Math.min(ancho / cuadro.ancho, alto / cuadro.alto);
+      const dx = (ancho - cuadro.ancho * escala) / 2;
+      const dy = (alto - cuadro.alto * escala) / 2;
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.lineWidth = 3;
+      ultimoResultado.rostros.filter((r) => (r.camara ?? 0) === numero).forEach((r) => {
+        const [x, y, w, h] = r.caja;
+        const color = COLORES[r.emocion] || "#1E7F5E";
+        const bx = dx + x * escala, by = dy + y * escala;
+        ctx.strokeStyle = color;
+        ctx.strokeRect(bx, by, w * escala, h * escala);
+        const texto = `${nombre(r.emocion)} ${Math.round(r.confianza)}%`;
+        const anchoTexto = ctx.measureText(texto).width + 12;
+        const ty = Math.max(0, by - 24);
+        ctx.fillStyle = color;
+        ctx.fillRect(bx - 1.5, ty, anchoTexto, 22);
+        ctx.fillStyle = "#141414";
+        ctx.fillText(texto, bx + 4.5, ty + 16);
+      });
     });
   }
 
+  function textoLectura(cuando, predominante, total, detalle) {
+    if (!total) return `${cuando} · sin rostros`;
+    return `${cuando} · ${nombre(predominante)} · ${total} ${total === 1 ? "rostro" : "rostros"}${detalle || ""}`;
+  }
+
+  function mostrarResumen(total, predominante, distribucion) {
+    $("rostros-ahora").textContent = total ?? "—";
+    $("predominante").textContent = nombre(predominante);
+    tarjetaColor($("tarjeta-predominante"), predominante);
+    barrasDistribucion($("barras-grupo"), distribucion || {}, false);
+  }
+
   function mostrarGrupo(resultado) {
-    $("rostros-ahora").textContent = resultado.total_rostros;
-    $("predominante").textContent = nombre(resultado.predominante);
-    tarjetaColor($("tarjeta-predominante"), resultado.predominante);
-    barrasDistribucion($("barras-grupo"), resultado.distribucion, false);
-    const plural = resultado.total_rostros === 1 ? "rostro" : "rostros";
-    lecturas.unshift(resultado.total_rostros
-      ? `${hora()} · ${nombre(resultado.predominante)} · ${resultado.total_rostros} ${plural}`
-      : `${hora()} · sin rostros`);
+    mostrarResumen(resultado.total_rostros, resultado.predominante, resultado.distribucion);
+    const porCamara = resultado.cuadros?.length > 1
+      ? ` (${resultado.cuadros.map((c) => c.total_rostros).join(" + ")})` : "";
+    lecturas.unshift(textoLectura(hora(), resultado.predominante, resultado.total_rostros, porCamara));
     lecturas.splice(ULTIMAS_LECTURAS);
     $("lecturas").replaceChildren(...lecturas.map((t) => crear("li", t)));
+  }
+
+  // ---------- Modo observador y sesión compartida ----------
+  function prepararObservador() {
+    if (!OBSERVADOR) return;
+    $("modo").hidden = false;
+    $("controles-camara").hidden = true;
+    $("botones-camara").hidden = true;
+    $("titulo-camara").textContent = "Clase en vivo · observador";
+    $("estado-camara").textContent = "Observador";
+    actualizarBotonesCamara();
+  }
+
+  function mostrarEnVivo(lista) {
+    const ultima = lista[0];
+    mostrarResumen(ultima ? ultima.total_rostros : null, ultima?.predominante, ultima?.distribucion);
+    const horaDe = (fecha) => new Date(fecha).toLocaleTimeString("es-PE");
+    $("lecturas").replaceChildren(...(lista.length
+      ? lista.map((l) => crear("li", textoLectura(horaDe(l.fecha), l.predominante, l.total_rostros)))
+      : [crear("li", "Sin lecturas todavía")]));
+  }
+
+  // Cada 5 s se revisa la sesión en curso: así esta página se entera si otra PC
+  // inicia o cierra la clase, y el observador ve las lecturas nuevas.
+  async function vigilar() {
+    try {
+      const datos = await pedir("/en-vivo");
+      const id = datos.sesion ? datos.sesion.id : null;
+      if (id !== (activa ? activa.id : null)) {
+        if (id === null && encendida()) detenerCamara();
+        await cargarSesiones();
+      }
+      if (OBSERVADOR) mostrarEnVivo(datos.lecturas);
+      $("estado-servidor").textContent = "● API conectada";
+    } catch (error) {
+      $("estado-servidor").textContent = "API no disponible";
+    } finally {
+      setTimeout(vigilar, INTERVALO_EN_VIVO_MS);
+    }
   }
 
   $("iniciar-camara").addEventListener("click", iniciarCamara);
@@ -516,7 +649,7 @@
   });
   $("capturar").addEventListener("click", () => programarAnalisis(true));
   $("intervalo").addEventListener("change", () => {
-    if (flujo) {
+    if (encendida()) {
       programarAnalisis(false);
       mensaje("mensaje-camara", `Ahora se analiza cada ${$("intervalo").value} s`);
     }
@@ -643,7 +776,8 @@
   }
 
   barrasDistribucion($("barras-grupo"), {}, false);
-  recargar(listarCamaras);
+  prepararObservador();
+  recargar(listarCamaras).finally(() => setTimeout(vigilar, OBSERVADOR ? 0 : INTERVALO_EN_VIVO_MS));
 </script>
 </body>
 </html>

@@ -17,7 +17,11 @@ except ImportError:  # Permite ejecutar `python src/camara.py`
 INDICE_CAMARA_DEFECTO = 0
 INTERVALO_ANALISIS_S = 5
 MARGEN_ROSTRO = 0.2
-TAMANO_MINIMO_ROSTRO = (60, 60)
+# El modelo se entrenó con rostros de 48x48 (FER2013): 30 px le alcanzan y así se
+# captan estudiantes a varios metros de la cámara (con 60 px, solo a ~1 m)
+TAMANO_MINIMO_ROSTRO = (30, 30)
+# Resolución que se pide a la cámara: con más píxeles, los rostros lejanos se ven más grandes
+RESOLUCION_CAMARA = (1280, 720)
 FACTOR_ESCALA = 1.1
 VECINOS_MINIMOS = 5
 DECIMALES = 2
@@ -85,6 +89,10 @@ class Camara:
         if not self.captura.isOpened():
             self.cerrar()
             raise ErrorCamara(f"No se pudo abrir la cámara {self.indice}")
+        # Si la cámara no llega a esa resolución, OpenCV usa la más cercana que tenga
+        ancho, alto = RESOLUCION_CAMARA
+        self.captura.set(cv2.CAP_PROP_FRAME_WIDTH, ancho)
+        self.captura.set(cv2.CAP_PROP_FRAME_HEIGHT, alto)
         return self
 
     def leer(self):
@@ -160,6 +168,21 @@ def resumen_grupo(rostros):
         distribucion[emocion] = round(suma / len(rostros), DECIMALES)
     predominante = max(EMOCIONES, key=lambda emocion: distribucion[emocion])
     return {"predominante": predominante, "distribucion": distribucion}
+
+
+def unir_camaras(resultados):
+    """Une las lecturas de varias cámaras del aula en una sola.
+
+    Cada rostro conserva el número de cámara (0, 1, ...) para dibujar su
+    recuadro en el video correcto; el resumen del grupo se calcula con los
+    rostros de todas las cámaras juntas.
+    """
+    rostros = [
+        {**rostro, "camara": numero}
+        for numero, resultado in enumerate(resultados)
+        for rostro in resultado["rostros"]
+    ]
+    return {"total_rostros": len(rostros), "rostros": rostros, **resumen_grupo(rostros)}
 
 
 class AnalizadorAula:

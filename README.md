@@ -185,6 +185,35 @@ En Windows y Mac, Docker Desktop no puede pasar una cámara USB al contenedor ni
 
 La app de escritorio (`python -m src.interfaz`) sigue disponible para usar el sistema sin Docker.
 
+### Dos cámaras en la misma PC
+
+Un aula grande no entra en una sola cámara. Se pueden conectar **dos cámaras** a la PC del aula, por ejemplo la integrada y una webcam USB, o dos USB apuntando a lados distintos del aula.
+
+1. En *Clase en vivo*, la primera vez pulsa **Detectar cámaras** y acepta el permiso del navegador.
+2. Elige la **Cámara 1** y la **Cámara 2** (por defecto, *Sin segunda cámara*). Si eliges la misma en las dos, la página avisa.
+3. Pulsa **Iniciar cámara**: se ven los dos videos, cada uno con los recuadros de sus rostros.
+
+En cada análisis, la página envía un cuadro por cámara en la misma petición. El contenedor los analiza y guarda **una sola lectura del aula**, con los rostros de ambas cámaras sumados. Por ejemplo, *4 rostros (2 + 2)*. El resumen del grupo y las estadísticas consideran las dos cámaras juntas.
+
+Si un estudiante aparece en las dos cámaras, se cuenta dos veces. Conviene que las cámaras apunten a zonas distintas del aula.
+
+### Entrar desde otra PC de la red (docente)
+
+El docente puede seguir la clase desde su propia PC, conectada a la **misma red o wifi** que la PC del aula.
+
+1. En la PC del aula, con el contenedor levantado, busca su IP en PowerShell con `ipconfig` (línea *Dirección IPv4*, por ejemplo `192.168.1.20`).
+2. Permite el puerto 5000 en el firewall de Windows. Se hace una sola vez, en PowerShell **como administrador**:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "EmotiContigo 5000" -Direction Inbound -LocalPort 5000 -Protocol TCP -Action Allow
+   ```
+3. El docente abre en su navegador **`http://192.168.1.20:5000`** (con la IP del paso 1).
+
+Desde otra PC, la página entra en **modo observador**. El navegador no permite usar la cámara en una dirección `http://IP`, y además por privacidad **no se transmite el video**. El docente ve en vivo el resumen del grupo (rostros, emoción predominante, distribución y últimas lecturas), que se actualiza cada 5 segundos con `GET /en-vivo`. También puede revisar *Estadísticas* e *Historial*, analizar una foto, e iniciar o cerrar la sesión. Si la cierra, la cámara del aula se detiene sola.
+
+- Si no conecta, revisa que las dos PC estén en la misma red y que la regla del firewall exista. Algunas redes wifi de universidades aíslan los equipos entre sí. En ese caso, una alternativa es compartir internet desde un celular y conectar las dos PC a ese punto de acceso.
+- Cualquier persona de la misma red que conozca la IP puede entrar. Los datos son solo emociones y porcentajes, nunca imágenes, pero conviene usarlo en la red del aula y apagar el contenedor (`docker compose down`) al terminar.
+
 ## Instalación local
 
 Requiere Python 3.10 o 3.11 y Git.
@@ -253,7 +282,8 @@ flake8 src tests --max-line-length=120              # estilo
 | `GET /sesiones` | Sesiones de clase con su cantidad de lecturas y detecciones |
 | `POST /sesiones` | Abre una sesión de clase. JSON: `curso`, `grado_seccion` y `docente` (opcional). Cierra la que estuviera abierta. |
 | `POST /sesiones/<id>/cerrar` | Cierra la sesión (`404` si no existe, `409` si ya estaba cerrada) |
-| `POST /analizar-cuadro` | Recibe un cuadro de la cámara en el campo `imagen`, detecta y clasifica todos los rostros y devuelve sus recuadros, la emoción predominante y la distribución del grupo. Necesita una sesión abierta (`409` si no hay). |
+| `POST /analizar-cuadro` | Recibe un cuadro por cámara (1 o 2) en el campo `imagen`. Detecta y clasifica todos los rostros y los guarda como una sola lectura. Devuelve los recuadros (con su número de `camara`), los datos de cada cuadro, la emoción predominante y la distribución del grupo. Necesita una sesión abierta (`409` si no hay) y acepta como máximo 2 cuadros (`400` si llegan más). |
+| `GET /en-vivo` | Sesión en curso y sus últimas 5 lecturas con la distribución promedio, para el modo observador. No incluye imágenes. |
 
 Ejemplo:
 
